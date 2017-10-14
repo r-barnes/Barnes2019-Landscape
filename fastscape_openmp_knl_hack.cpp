@@ -1,16 +1,3 @@
-//real, dimension(:), allocatable :: h,accum,length
-//real, dimension(:,:), allocatable :: x,y,z
-//integer, dimension(:), allocatable :: rec,ndon,stack
-//integer, dimension(:,:), allocatable :: donor
-
-//integer WIDTH,HEIGHT,SIZE,nstep,nfreq,nstack
-//integer i,j,ij,ii,jj,iii,jjj,ijk,ijr,istep
-//real xl,yl,dx,dy,dt,k,n,m,u,l,slope,smax
-//real diff,fact,h0,hp,tol
-
-//-pedantic -Wall -Wextra -Wcast-align -Wcast-qual -Wctor-dtor-privacy -Wdisabled-optimization -Wformat=2 -Winit-self -Wlogical-op -Wmissing-include-dirs -Wnoexcept -Wold-style-cast -Woverloaded-virtual -Wredundant-decls -Wshadow -Wsign-conversion -Wsign-promo -Wstrict-null-sentinel -Wstrict-overflow=5 -Wswitch-default -Wundef -Werror -Wno-unused
-
-
 #include <cstdlib>
 #include <limits>
 #include <iostream>
