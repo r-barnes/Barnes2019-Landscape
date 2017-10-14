@@ -54,9 +54,6 @@ void PrintDEM(
 
 
 int main(){
-  unsigned long long cells_processed = 0;
-  unsigned long long cells_eroded    = 0;
-
   //feenableexcept(FE_ALL_EXCEPT);
 
   //! defining size of the problem
@@ -180,7 +177,6 @@ int main(){
     std::cerr<<std::endl;
 
     for(int s=0;s<SIZE;s++){
-      cells_processed++;
       const int c = stack[s]; //Cell from which flow originates
       if(rec[c]==NO_FLOW)
         continue;
@@ -208,9 +204,6 @@ int main(){
       //print*,minval(h),sum(h)/SIZE,maxval(h)
 
   }
-
-  std::cout<<"Cells processed = "<<cells_processed<<std::endl;
-  std::cout<<"Cells eroded = "<<cells_eroded<<std::endl;
 
   PrintDEM("out.dem", h, WIDTH, HEIGHT);
 

@@ -155,8 +155,10 @@ int main(){
 
     for(int s=SIZE-1;s>=0;s--){
       const int c = stack[s];
-      if(rec[c]!=c)
-        accum[rec[c]] = accum[rec[c]] + accum[c];
+      if(rec[c]!=c){
+        const int n = rec[c];
+        accum[n] = accum[n] + accum[c];
+      }
     }
 
     //! adding uplift to landscape
