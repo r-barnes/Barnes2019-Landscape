@@ -11,20 +11,15 @@
 const double keq = 2e-6;
 const double neq = 2;
 const double meq = 0.8;
-const double u   = 2e-3;
+const double ueq = 2e-3;
 const double dt  = 1000.;
 
-double *h;
-double *accum;
-double *length;
-int    *rec;
-int    *ndon;
-int    *stack;
-int    *donor;
-
-
-
-void PrintDEM(const std::string filename, const int width, const int height){
+void PrintDEM(
+  const std::string filename, 
+  const std::vector<double> &h,
+  const int width,
+  const int height
+){
   std::ofstream fout(filename.c_str());
   fout<<"cols"<<width<<"\n";
   fout<<"nrows"<<height<<"\n";
