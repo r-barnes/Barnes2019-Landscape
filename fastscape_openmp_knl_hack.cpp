@@ -14,6 +14,20 @@ const double meq = 0.8;
 const double ueq = 2e-3;
 const double dt  = 1000.;
 
+constexpr double DINFTY  = std::numeric_limits<double>::infinity();
+const     int    NO_FLOW = -1;
+
+const double SQRT2 = 1.414213562373095048801688724209698078569671875376948;
+const double dr[8] = {1,SQRT2,1,SQRT2,1,SQRT2,1,SQRT2};
+
+std::vector<double> h;
+std::vector<double> accum;
+std::vector<int>    rec;
+std::vector<int>    ndon;
+std::vector<int>    stack;
+std::vector<int>    donor;
+std::vector<double> nshift;
+
 void PrintDEM(
   const std::string filename, 
   const std::vector<double> &h,
