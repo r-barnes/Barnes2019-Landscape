@@ -2,7 +2,9 @@
 #include <limits>
 #include <iostream>
 #include <cmath>
+#include <vector>
 #include <fstream>
+#include <fenv.h> //Used to catch floating point NaN issues
 #include <queue>
 #include <functional>
 
