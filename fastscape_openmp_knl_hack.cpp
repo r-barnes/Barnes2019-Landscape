@@ -2,10 +2,8 @@
 #include <cstdlib>
 #include <fenv.h> //Used to catch floating point NaN issues
 #include <fstream>
-#include <functional>
 #include <iostream>
 #include <limits>
-#include <queue>
 #include <vector>
 
 const double keq = 2e-6;
@@ -21,13 +19,6 @@ const double SQRT2  = 1.414213562373095048801688724209698078569671875376948;
 const double dr[8]  = {1,SQRT2,1,SQRT2,1,SQRT2,1,SQRT2};
 
 
-std::vector<double> h;
-std::vector<double> accum;
-std::vector<int>    rec;
-std::vector<int>    ndon;
-std::vector<int>    stack;
-std::vector<int>    donor;
-std::vector<double> nshift;
 
 void PrintDEM(
   const std::string filename, 
@@ -51,23 +42,29 @@ void PrintDEM(
 
 
 
-void ErodePoint( int c){
+void ErodePoint(
+  const int c,
+        std::vector<double> &h,
+  const std::vector<int>    &rec,
+  const std::vector<double> &accum,
+  const std::vector<int>    &nshift,
+  const std::vector<int>    &donor,
+  const std::vector<int>    &ndon
+){
   // #pragma omp critical
   // {
   //   std::cout<<c<<std::endl;
   // }
 
-  //int c=1337;
-
-  if(c!=rec[c]){
-
-    const double fact = keq*dt*std::pow(accum[c],meq)/std::pow(length[c],neq);
+  if(rec[c]!=NO_FLOW){
+    const int    n      = c+nshift[rec[n]];
+    const double length = dr[rec[n]];
+    const double fact   = keq*dt*std::pow(accum[c],meq)/std::pow(length,neq);
     //Use Newton's method to solve backward Euler equation. Fix number of loops
     //to 5, which should be sufficient
-    const double hn = h[rec[c]];
+    const double hn = h[n];
     const double h0 = h[c];
     double hnew     = h0;
-
     for(int i=0;i<5;i++)
       hnew -= (hnew-h0+fact*std::pow(hnew-hn,neq))/(1.+fact*neq*std::pow(hnew-hn,neq-1));
 
@@ -77,9 +74,9 @@ void ErodePoint( int c){
   if(ndon[c]>0){
     for(int k=1;k<ndon[c];k++){
       #pragma omp task shared(h)
-      ErodePoint(donor[8*c+k]);
+      ErodePoint(donor[8*c+k],h,rec,accum,nshift,donor,ndon);
     }
-    ErodePoint(donor[8*c+0]);
+    ErodePoint(donor[8*c+0],h,rec,accum,nshift,donor,ndon);
   }
 }
 
@@ -177,9 +174,7 @@ int main(){
       h[c] += ueq*dt;
     }
 
-    //! computing stack
 
-    std::queue<int> qu;
 
     //Initialize stack with cells which do not have dependencies
     #pragma omp parallel
@@ -189,7 +184,7 @@ int main(){
         for(int c=0;c<SIZE;c++){
           if(rec[c]==c){
             #pragma omp task shared(h)
-            ErodePoint(c);
+            ErodePoint(c,h,rec,accum,nshift,donor,ndon);
           }
         }
       }
@@ -198,10 +193,11 @@ int main(){
 
     if( istep%20==0 )
       std::cout<<istep<<std::endl;
+      //print*,minval(h),sum(h)/SIZE,maxval(h)
 
   }
 
-  PrintDEM("out.dem", WIDTH, HEIGHT);
+  PrintDEM("out.dem", h, WIDTH, HEIGHT);
 
   return 0;
 }

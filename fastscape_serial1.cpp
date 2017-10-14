@@ -158,24 +158,7 @@ int main(){
       h[c] += ueq*dt;
     }
 
-    std::cout<<"rec: ";
-    for(int c=3*WIDTH;c<4*WIDTH;c++){
-      if(rec[c]==NO_FLOW)
-        std::cout<<-1<<" ";
-      else
-        std::cout<<(c+nshift[rec[c]])<<" ";
-    }
-    std::cout<<std::endl;
 
-    //! computing erosion
-    std::cerr<<"length: ";
-    for(int i=3*WIDTH;i<4*WIDTH;i++){
-      if(rec[i]==NO_FLOW)
-	std::cerr<<"0 ";
-      else
-        std::cerr<<dr[rec[i]]<<" ";
-    }
-    std::cerr<<std::endl;
 
     for(int s=0;s<SIZE;s++){
       const int c = stack[s]; //Cell from which flow originates
