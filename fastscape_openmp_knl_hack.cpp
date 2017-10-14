@@ -42,14 +42,30 @@ void PrintDEM(
 
 
 
+void find_stack(
+  const int c, 
+  const std::vector<int> &donor,
+  const std::vector<int> &ndon,
+  std::vector<int> &stack,
+  int &nstack
+){
+  for(int k=0;k<ndon[c];k++){
+    int n           = donor[8*c+k];
+    stack[nstack++] = n;
+    find_stack(n,donor,ndon,stack,nstack);
+  }
+}
+
+
+
 void ErodePoint(
   const int c,
-        std::vector<double> &h,
+  const std::vector<int>    &donor,
+  const std::vector<int>    &ndon,
   const std::vector<int>    &rec,
   const std::vector<double> &accum,
   const std::vector<int>    &nshift,
-  const std::vector<int>    &donor,
-  const std::vector<int>    &ndon
+        std::vector<double> &h
 ){
   // #pragma omp critical
   // {
@@ -74,9 +90,9 @@ void ErodePoint(
   if(ndon[c]>0){
     for(int k=1;k<ndon[c];k++){
       #pragma omp task shared(h)
-      ErodePoint(donor[8*c+k],h,rec,accum,nshift,donor,ndon);
+      ErodePoint(donor[8*c+k],donor,ndon,rec,accum,nshift,h);
     }
-    ErodePoint(donor[8*c+0],h,rec,accum,nshift,donor,ndon);
+    ErodePoint(donor[8*c+0],donor,ndon,rec,accum,nshift,h);
   }
 }
 
@@ -155,6 +171,16 @@ int main(){
       ndon[n]++;
     }
 
+    //! computing stack
+
+    int nstack=0;
+    for(int c=0;c<SIZE;c++){
+      if(rec[c]==NO_FLOW){
+        stack[nstack++] = c;
+        find_stack(c,donor,ndon,stack,nstack);
+      }
+    }
+
     //! computing drainage area
     for(int i=0;i<SIZE;i++)
       accum[i] = dx*dy;
@@ -182,13 +208,14 @@ int main(){
       #pragma omp single nowait
       {
         for(int c=0;c<SIZE;c++){
-          if(rec[c]==c){
+          if(rec[c]==NO_FLOW){
             #pragma omp task shared(h)
-            ErodePoint(c,h,rec,accum,nshift,donor,ndon);
+            ErodePoint(c,donor,ndon,rec,accum,nshift,h);
           }
         }
       }
     }
+
 
 
     if( istep%20==0 )

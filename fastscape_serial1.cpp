@@ -18,20 +18,6 @@ const     int    NO_FLOW = -1;
 const double SQRT2  = 1.414213562373095048801688724209698078569671875376948;
 const double dr[8]  = {1,SQRT2,1,SQRT2,1,SQRT2,1,SQRT2};
 
-void find_stack(
-  const int c, 
-  const std::vector<int> &donor,
-  const std::vector<int> &ndon,
-  int SIZE, 
-  std::vector<int> &stack,
-  int &nstack
-){
-  for(int k=0;k<ndon[c];k++){
-    int n           = donor[8*c+k];
-    stack[nstack++] = n;
-    find_stack(n,donor,ndon,SIZE,stack,nstack);
-  }
-}
 
 
 void PrintDEM(
@@ -51,6 +37,22 @@ void PrintDEM(
     for(int x=0;x<width;x++)
       fout<<h[y*width+x]<<" ";
     fout<<"\n";
+  }
+}
+
+
+
+void find_stack(
+  const int c, 
+  const std::vector<int> &donor,
+  const std::vector<int> &ndon,
+  std::vector<int> &stack,
+  int &nstack
+){
+  for(int k=0;k<ndon[c];k++){
+    int n           = donor[8*c+k];
+    stack[nstack++] = n;
+    find_stack(n,donor,ndon,stack,nstack);
   }
 }
 
@@ -135,7 +137,7 @@ int main(){
     for(int c=0;c<SIZE;c++){
       if(rec[c]==NO_FLOW){
         stack[nstack++] = c;
-        find_stack(c,donor,ndon,SIZE,stack,nstack);
+        find_stack(c,donor,ndon,stack,nstack);
       }
     }
 
