@@ -1,9 +1,10 @@
-#include <cstdlib>
-#include <limits>
-#include <iostream>
 #include <cmath>
-#include <fstream>
+#include <cstdlib>
 #include <fenv.h> //Used to catch floating point NaN issues
+#include <fstream>
+#include <iostream>
+#include <limits>
+#include <vector>
 
 const double keq = 2e-6;
 const double neq = 2;
@@ -15,7 +16,12 @@ constexpr double DINFTY  = std::numeric_limits<double>::infinity();
 const     int    NO_FLOW = -1;
 
 void find_stack(
-  const int c, int donor[], int ndon[], int SIZE, int stack[], int &nstack
+  const int c, 
+  const std::vector<int> &donor,
+  const std::vector<int> &ndon,
+  int SIZE, 
+  std::vector<int> &stack,
+  int &nstack
 ){
   for(int k=0;k<ndon[c];k++){
     int n           = donor[8*c+k];
@@ -25,7 +31,12 @@ void find_stack(
 }
 
 
-void PrintDEM(const std::string filename, const double h[], const int width, const int height){
+void PrintDEM(
+  const std::string filename, 
+  const std::vector<double> &h,
+  const int width,
+  const int height
+){
   std::ofstream fout(filename.c_str());
   fout<<"ncols "<<width<<"\n";
   fout<<"nrows "<<height<<"\n";
@@ -54,17 +65,17 @@ int main(){
   const int SIZE   = WIDTH*HEIGHT;
 
   //!    allocating memory
-  double *h      = new double[SIZE];
-  double *accum  = new double[SIZE];
-  double *length = new double[SIZE];
-  int    *rec    = new int[SIZE];
-  int    *ndon   = new int[SIZE];
-  int    *stack  = new int[SIZE];
-  int    *donor  = new int[8*SIZE];
+  std::vector<double> h    (  SIZE);
+  std::vector<double> accum(  SIZE);
+  std::vector<double> length( SIZE);
+  std::vector<int>    rec  (  SIZE);
+  std::vector<int>    ndon (  SIZE);
+  std::vector<int>    stack(  SIZE);
+  std::vector<int>    donor(8*SIZE);
   
 
   //Neighbours
-  const int nshift[8] = {-1,-WIDTH-1,-WIDTH,-WIDTH+1,1,WIDTH+1,WIDTH,WIDTH-1};
+  const std::vector<int> nshift= {{-1,-WIDTH-1,-WIDTH,-WIDTH+1,1,WIDTH+1,WIDTH,WIDTH-1}};
   const double SQRT2  = 1.414213562373095048801688724209698078569671875376948;
   const double dr[8]  = {1,SQRT2,1,SQRT2,1,SQRT2,1,SQRT2};
 
