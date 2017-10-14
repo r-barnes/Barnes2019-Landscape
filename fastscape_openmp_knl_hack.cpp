@@ -35,11 +35,11 @@ void PrintDEM(
   const int height
 ){
   std::ofstream fout(filename.c_str());
-  fout<<"cols"<<width<<"\n";
-  fout<<"nrows"<<height<<"\n";
-  fout<<"xllcorner 637500.000\n";
-  fout<<"yllcorner 206000.000\n";
-  fout<<"cellsize 500.000\n";
+  fout<<"ncols "<<width<<"\n";
+  fout<<"nrows "<<height<<"\n";
+  fout<<"xllcorner 637500.000\n"; //Arbitrarily chosen value
+  fout<<"yllcorner 206000.000\n"; //Arbitrarily chosen value
+  fout<<"cellsize 500.000\n";     //Arbitrarily chosen value
   fout<<"NODATA_value -9999\n";
   for(int y=0;y<height;y++){
     for(int x=0;x<width;x++)
