@@ -1,14 +1,3 @@
-//real, dimension(:), allocatable :: h,a,length
-//real, dimension(:,:), allocatable :: x,y,z
-//integer, dimension(:), allocatable :: rec,ndon,stack
-//integer, dimension(:,:), allocatable :: donor
-
-//integer WIDTH,HEIGHT,SIZE,nstep,nfreq,nstack
-//integer i,j,ij,ii,jj,iii,jjj,ijk,ijr,istep
-//real xl,yl,dx,dy,dt,k,n,m,ueq,l,slope,smax
-//real diff,fact,h0,hp,tol
-
-
 #include <cstdlib>
 #include <limits>
 #include <iostream>
@@ -16,7 +5,14 @@
 #include <fstream>
 #include <fenv.h> //Used to catch floating point NaN issues
 
-constexpr double DINFTY = std::numeric_limits<double>::infinity();
+const double keq = 2e-6;
+const double neq = 2;
+const double meq = 0.8;
+const double ueq = 2e-3;
+const double dt  = 1000.;
+
+constexpr double DINFTY  = std::numeric_limits<double>::infinity();
+const     int    NO_FLOW = -1;
 
 void find_stack(
   const int c, int donor[], int ndon[], int SIZE, int stack[], int &nstack
@@ -28,13 +24,14 @@ void find_stack(
   }
 }
 
+
 void PrintDEM(const std::string filename, const double h[], const int width, const int height){
   std::ofstream fout(filename.c_str());
   fout<<"ncols "<<width<<"\n";
   fout<<"nrows "<<height<<"\n";
-  fout<<"xllcorner 637500.000\n";
-  fout<<"yllcorner 206000.000\n";
-  fout<<"cellsize 500.000\n";
+  fout<<"xllcorner 637500.000\n"; //Arbitrarily chosen value
+  fout<<"yllcorner 206000.000\n"; //Arbitrarily chosen value
+  fout<<"cellsize 500.000\n";     //Arbitrarily chosen value
   fout<<"NODATA_value -9999\n";
   for(int y=0;y<height;y++){
     for(int x=0;x<width;x++)
@@ -44,6 +41,7 @@ void PrintDEM(const std::string filename, const double h[], const int width, con
 }
 
 
+
 int main(){
   unsigned long long cells_processed = 0;
   unsigned long long cells_eroded    = 0;
@@ -51,15 +49,13 @@ int main(){
   //feenableexcept(FE_ALL_EXCEPT);
 
   //! defining size of the problem
-  const int WIDTH = 501;
+  const int WIDTH  = 501;
   const int HEIGHT = 501;
-  //const int WIDTH = 101;
-  //const int HEIGHT = 101;
-  const int SIZE = WIDTH*HEIGHT;
+  const int SIZE   = WIDTH*HEIGHT;
 
   //!    allocating memory
   double *h      = new double[SIZE];
-  double *a      = new double[SIZE];
+  double *accum  = new double[SIZE];
   double *length = new double[SIZE];
   int    *rec    = new int[SIZE];
   int    *ndon   = new int[SIZE];
@@ -73,30 +69,21 @@ int main(){
   const double dr[8]  = {1,SQRT2,1,SQRT2,1,SQRT2,1,SQRT2};
 
   //defining geometrical and temporal constants
-  const double xl   = 100.e3;
-  const double yl   = 100.e3;
-  const double dx   = xl/(WIDTH-1);
-  const double dy   = yl/(HEIGHT-1);
-  //const double dt = 10000.;
-  const double dt   = 1000.;
-  //const int nstep = 300;
-  const int nstep   = 120;
-  const double tol  = 1.e-3;
+  const double xl  = 100.e3;
+  const double yl  = 100.e3;
+  const double dx  = xl/(WIDTH-1);
+  const double dy  = yl/(HEIGHT-1);
+  const int nstep  = 120;
+  const double tol = 1.e-3;
 
   //! generating initial topography
   for(int y=0;y<HEIGHT;y++)
   for(int x=0;x<WIDTH;x++){
     int c = y*WIDTH+x;
     h[c]  = rand()/(double)RAND_MAX;
-    //h[c]=500;
     if(x == 0 || y==0 || x==WIDTH-1 || y==HEIGHT-1)
       h[c] = 0;
   }
-
-  const double k   = 5e-4;
-  const double neq = 1;
-  const double meq = 0.5;
-  const double ueq = 2e-4;
 
   //! begining of time stepping
   for(int istep=0;istep<nstep;istep++){
@@ -153,12 +140,12 @@ int main(){
 
     //! computing drainage area
     for(int i=0;i<SIZE;i++)
-      a[i] = dx*dy;
+      accum[i] = dx*dy;
 
     for(int s=SIZE-1;s>=0;s--){
       const int c = stack[s];
       if(rec[c]!=c)
-        a[rec[c]] = a[rec[c]] + a[c];
+        accum[rec[c]] = accum[rec[c]] + accum[c];
     }
 
     //! adding uplift to landscape
@@ -190,7 +177,7 @@ int main(){
       if(n==c)
         continue;
       cells_eroded++;
-      const double fact = k*dt*std::pow(a[c],meq)/std::pow(length[c],neq);
+      const double fact = keq*dt*std::pow(accum[c],meq)/std::pow(length[c],neq);
       const double h0   = h[c];
       double hp         = h0;
       double diff       = 2*tol;
