@@ -15,6 +15,9 @@ const double dt  = 1000.;
 constexpr double DINFTY  = std::numeric_limits<double>::infinity();
 const     int    NO_FLOW = -1;
 
+const double SQRT2  = 1.414213562373095048801688724209698078569671875376948;
+const double dr[8]  = {1,SQRT2,1,SQRT2,1,SQRT2,1,SQRT2};
+
 void find_stack(
   const int c, 
   const std::vector<int> &donor,
@@ -72,8 +75,6 @@ int main(){
 
   //Neighbours
   const std::vector<int> nshift= {{-1,-WIDTH-1,-WIDTH,-WIDTH+1,1,WIDTH+1,WIDTH,WIDTH-1}};
-  const double SQRT2  = 1.414213562373095048801688724209698078569671875376948;
-  const double dr[8]  = {1,SQRT2,1,SQRT2,1,SQRT2,1,SQRT2};
 
   //defining geometrical and temporal constants
   const double xl  = 100.e3;
@@ -86,7 +87,7 @@ int main(){
   //! generating initial topography
   for(int y=0;y<HEIGHT;y++)
   for(int x=0;x<WIDTH;x++){
-    int c = y*WIDTH+x;
+    const int c = y*WIDTH+x;
     h[c]  = rand()/(double)RAND_MAX;
     if(x == 0 || y==0 || x==WIDTH-1 || y==HEIGHT-1)
       h[c] = 0;

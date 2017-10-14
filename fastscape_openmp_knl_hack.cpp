@@ -1,12 +1,12 @@
-#include <cstdlib>
-#include <limits>
-#include <iostream>
 #include <cmath>
-#include <vector>
-#include <fstream>
+#include <cstdlib>
 #include <fenv.h> //Used to catch floating point NaN issues
-#include <queue>
+#include <fstream>
 #include <functional>
+#include <iostream>
+#include <limits>
+#include <queue>
+#include <vector>
 
 const double keq = 2e-6;
 const double neq = 2;
@@ -17,8 +17,9 @@ const double dt  = 1000.;
 constexpr double DINFTY  = std::numeric_limits<double>::infinity();
 const     int    NO_FLOW = -1;
 
-const double SQRT2 = 1.414213562373095048801688724209698078569671875376948;
-const double dr[8] = {1,SQRT2,1,SQRT2,1,SQRT2,1,SQRT2};
+const double SQRT2  = 1.414213562373095048801688724209698078569671875376948;
+const double dr[8]  = {1,SQRT2,1,SQRT2,1,SQRT2,1,SQRT2};
+
 
 std::vector<double> h;
 std::vector<double> accum;
@@ -94,66 +95,54 @@ int main(){
   const int SIZE     = WIDTH*HEIGHT;
 
   //!    allocating memory
-  h      = new double[SIZE];
-  accum  = new double[SIZE];
-  length = new double[SIZE];
-  rec    = new int[SIZE];
-  ndon   = new int[SIZE];
-  stack  = new int[SIZE];
-  donor  = new int[8*SIZE];
+  std::vector<double> h    (  SIZE);
+  std::vector<double> accum(  SIZE);
+  std::vector<int>    rec  (  SIZE);
+  std::vector<int>    ndon (  SIZE);
+  std::vector<int>    stack(  SIZE);
+  std::vector<int>    donor(8*SIZE);
   
-  //double x[SIZE];
-  //double y[SIZE];
-  //double z[SIZE];
 
   //Neighbours
-  const int nshift[8] = {-1,-WIDTH-1,-WIDTH,-WIDTH+1,1,WIDTH+1,WIDTH,WIDTH-1};
-  const double SQRT2 = 1.414213562373095048801688724209698078569671875376948;
-  const double dr[8] = {1,SQRT2,1,SQRT2,1,SQRT2,1,SQRT2};
+  const std::vector<int> nshift= {{-1,-WIDTH-1,-WIDTH,-WIDTH+1,1,WIDTH+1,WIDTH,WIDTH-1}};
 
   //defining geometrical and temporal constants
   const double xl = 100.e3;
   const double yl = 100.e3;
   const double dx = xl/(WIDTH-1);
   const double dy = yl/(HEIGHT-1);
-  //const int nstep = 300;
   const int nstep = 120;
 
   //! generating initial topography
   for(int y=0;y<HEIGHT;y++)
   for(int x=0;x<WIDTH;x++){
-    int ij = y*WIDTH+x;
-    h[ij]  = rand()/(double)RAND_MAX;
+    const int c = y*WIDTH+x;
+    h[c]  = rand()/(double)RAND_MAX;
     if(x == 0 || y==0 || x==WIDTH-1 || y==HEIGHT-1)
-      h[ij] = 0;
+      h[c] = 0;
   }
 
   //! begining of time stepping
   for(int istep=0;istep<nstep;istep++){
 
     //! initializing rec and length
-    for(int i=0;i<SIZE;i++){
-      rec[i]    = i;
-      length[i] = 0;
-    }
+    for(int i=0;i<SIZE;i++)
+      rec[i] = NO_FLOW;
 
     //! computing receiver array
     for(int y=1;y<HEIGHT-1;y++)
     for(int x=1;x<WIDTH-1;x++){
-      int c            = y*HEIGHT+x;
-      double slope_max = -std::numeric_limits<double>::infinity(); //Slope max
-      int max_n        = c;
-      int slope_n      = 0;
+      const int c      = y*WIDTH+x;
+      double max_slope = -DINFTY;
+      int    max_n     = NO_FLOW;
       for(int n=0;n<8;n++){
         double slope = (h[c] - h[c+nshift[n]])/dr[n];
-        if(slope>slope_max){
-          slope_max = slope;
+        if(slope>max_slope){
+          max_slope = slope;
           max_n = n;
-          slope_n=dr[n];
         }
       }
       rec[c]    = max_n;
-      length[c] = slope_n;
     }
 
     //! initialising number of donors per node to 0
@@ -161,11 +150,11 @@ int main(){
       ndon[i] = 0;
 
     //! computing donor arrays
-    for(int i=0;i<SIZE;i++){
-      if(rec[i]==i)
+    for(int c=0;c<SIZE;c++){
+      if(rec[c]==NO_FLOW)
         continue;
-      const int n        = rec[i];
-      donor[8*n+ndon[n]] = i;
+      const int n        = c+nshift[rec[c]];
+      donor[8*n+ndon[n]] = c;
       ndon[n]++;
     }
 
@@ -175,15 +164,17 @@ int main(){
 
     for(int s=SIZE-1;s>=0;s--){
       const int c = stack[s];
-      if(rec[c]!=c)
-        accum[rec[c]] = accum[rec[c]] + accum[c];
+      if(rec[c]!=NO_FLOW){
+        const int n = c+nshift[rec[c]];
+        accum[n]   += accum[c];
+      }
     }
 
     //! adding uplift to landscape
     for(int y=1;y<HEIGHT-1;y++)
     for(int x=1;x<WIDTH-1;x++){
       int c = y*WIDTH+x;
-      h[c] += u*dt;
+      h[c] += ueq*dt;
     }
 
     //! computing stack
