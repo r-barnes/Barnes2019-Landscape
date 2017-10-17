@@ -132,7 +132,6 @@ int main(){
     }
 
     //! computing stack
-
     int nstack=0;
     for(int c=0;c<SIZE;c++){
       if(rec[c]==NO_FLOW){
@@ -156,7 +155,7 @@ int main(){
     //! adding uplift to landscape
     for(int y=1;y<HEIGHT-1;y++)
     for(int x=1;x<WIDTH-1;x++){
-      int c = y*WIDTH+x;
+      const int c = y*WIDTH+x;
       h[c] += ueq*dt;
     }
 
