@@ -80,12 +80,12 @@ int main(){
   const double dr[8]  = {1,SQRT2,1,SQRT2,1,SQRT2,1,SQRT2};
 
   //defining geometrical and temporal constants
-  const double xl  = 100.e3;
-  const double yl  = 100.e3;
-  const double dx  = xl/(WIDTH-1);
-  const double dy  = yl/(HEIGHT-1);
-  const int nstep  = 120;
-  const double tol = 1.e-3;
+  const double xl    = 100.e3;
+  const double yl    = 100.e3;
+  const double dx    = xl/(WIDTH-1);
+  const double dy    = yl/(HEIGHT-1);
+  const int    nstep = 120;
+  const double tol   = 1.e-3;
 
   //! generating initial topography
   for(int y=0;y<HEIGHT;y++)
