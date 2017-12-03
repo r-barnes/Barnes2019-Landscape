@@ -8,6 +8,8 @@
 #include <iostream>
 #include <limits>
 #include <vector>
+#include <iomanip>
+#include "CumulativeTimer.hpp"
 
 const double keq = 2e-6;
 const double neq = 2;
@@ -57,8 +59,16 @@ void PrintDEM(
 
 
 int main(){
-  unsigned long long cells_processed = 0;
-  unsigned long long cells_eroded    = 0;
+  CumulativeTimer Tmr_Step1_Initialize;
+  CumulativeTimer Tmr_Step2_DetermineReceivers;
+  CumulativeTimer Tmr_Step3_DetermineDonors;
+  CumulativeTimer Tmr_Step4_GenerateStack;
+  CumulativeTimer Tmr_Step5_FlowAcc;
+  CumulativeTimer Tmr_Step6_Uplift;
+  CumulativeTimer Tmr_Step7_Erosion;
+  CumulativeTimer Tmr_Overall;
+
+  Tmr_Overall.start();
 
   //feenableexcept(FE_ALL_EXCEPT);
 
@@ -91,6 +101,7 @@ int main(){
   const double tol   = 1.e-3;
 
   //! generating initial topography
+  Tmr_Step1_Initialize.start();
   for(int y=0;y<HEIGHT;y++)
   for(int x=0;x<WIDTH;x++){
     const int c = y*WIDTH+x;
@@ -98,11 +109,14 @@ int main(){
     if(x == 0 || y==0 || x==WIDTH-1 || y==HEIGHT-1)
       h[c] = 0;
   }
+  Tmr_Step1_Initialize.stop();  
+
 
   //! begining of time stepping
   for(int istep=0;istep<nstep;istep++){
 
     //! initializing rec and length
+    Tmr_Step2_DetermineReceivers.start();
     for(int i=0;i<SIZE;i++){
       rec[i]    = i;
       length[i] = 0;
@@ -128,8 +142,11 @@ int main(){
         length[c] = slope_n;
       }
     }
+    Tmr_Step2_DetermineReceivers.stop();
+
 
     //! initialising number of donors per node to 0
+    Tmr_Step3_DetermineDonors.start();    
     for(int i=0;i<SIZE;i++)
       ndon[i] = 0;
 
@@ -141,8 +158,11 @@ int main(){
       donor[8*n+ndon[n]] = c;
       ndon[n]++;
     }
+    Tmr_Step3_DetermineDonors.stop();
+
 
     //! computing stack
+    Tmr_Step4_GenerateStack.start();    
     int nstack=0;
     for(int c=0;c<SIZE;c++){
       if(rec[c]==c){
@@ -150,8 +170,11 @@ int main(){
         find_stack(c,donor,ndon,SIZE,stack,nstack);
       }
     }
+    Tmr_Step4_GenerateStack.stop();
+
 
     //! computing drainage area
+    Tmr_Step5_FlowAcc.start();    
     for(int i=0;i<SIZE;i++)
       accum[i] = dx*dy;
 
@@ -162,13 +185,18 @@ int main(){
         accum[n] += accum[c];
       }
     }
+    Tmr_Step5_FlowAcc.stop();
+
 
     //! adding uplift to landscape
+    Tmr_Step6_Uplift.start();    
     for(int y=1;y<HEIGHT-1;y++)
     for(int x=1;x<WIDTH-1;x++){
       int c = y*WIDTH+x;
       h[c] += ueq*dt;
     }
+    Tmr_Step6_Uplift.stop();
+
 
     // std::cout<<"rec: ";
     // for(int c=3*WIDTH;c<4*WIDTH;c++){
@@ -185,13 +213,12 @@ int main(){
     // std::cerr<<std::endl;
 
     //! computing erosion
+    Tmr_Step7_Erosion.start();    
     for(int s=0;s<SIZE;s++){
-      cells_processed++;
       const int c = stack[s]; //Cell from which flow originates
       const int n = rec[c];   //Cell receiving the flow
       if(n==c)
         continue;
-      cells_eroded++;
       const double fact = keq*dt*std::pow(accum[c],meq)/std::pow(length[c],neq);
       const double hn   = h[n];
       const double h0   = h[c];
@@ -205,6 +232,7 @@ int main(){
       }
       h[c] = hnew;
     }
+    Tmr_Step7_Erosion.stop();
 
     if( istep%20==0 )
       std::cout<<istep<<std::endl;
@@ -212,8 +240,15 @@ int main(){
 
   }
 
-  std::cout<<"Cells processed = "<<cells_processed<<std::endl;
-  std::cout<<"Cells eroded = "<<cells_eroded<<std::endl;
+  std::cout<<"t Step1: Initialize         = "<<std::setw(15)<<Tmr_Step1_Initialize.elapsed()         <<" microseconds"<<std::endl;                 
+  std::cout<<"t Step2: DetermineReceivers = "<<std::setw(15)<<Tmr_Step2_DetermineReceivers.elapsed() <<" microseconds"<<std::endl;                         
+  std::cout<<"t Step3: DetermineDonors    = "<<std::setw(15)<<Tmr_Step3_DetermineDonors.elapsed()    <<" microseconds"<<std::endl;                      
+  std::cout<<"t Step4: GenerateStack      = "<<std::setw(15)<<Tmr_Step4_GenerateStack.elapsed()      <<" microseconds"<<std::endl;                    
+  std::cout<<"t Step5: FlowAcc            = "<<std::setw(15)<<Tmr_Step5_FlowAcc.elapsed()            <<" microseconds"<<std::endl;              
+  std::cout<<"t Step6: Uplift             = "<<std::setw(15)<<Tmr_Step6_Uplift.elapsed()             <<" microseconds"<<std::endl;             
+  std::cout<<"t Step7: Erosion            = "<<std::setw(15)<<Tmr_Step7_Erosion.elapsed()            <<" microseconds"<<std::endl;              
+  std::cout<<"t Overall                   = "<<std::setw(15)<<Tmr_Overall.elapsed()                  <<" microseconds"<<std::endl;        
+
 
   PrintDEM("out_BW.dem", h, WIDTH, HEIGHT);
 
