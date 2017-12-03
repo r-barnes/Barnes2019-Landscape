@@ -5,3 +5,5 @@ Profile.txt
 out.dem*
 perf.data*
 *.exe
+*.dem
+*.dem.aux.xml
