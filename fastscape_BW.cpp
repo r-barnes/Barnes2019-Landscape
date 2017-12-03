@@ -143,7 +143,6 @@ int main(){
     }
 
     //! computing stack
-
     int nstack=0;
     for(int c=0;c<SIZE;c++){
       if(rec[c]==c){
