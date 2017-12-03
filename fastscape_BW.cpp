@@ -194,14 +194,17 @@ int main(){
         continue;
       cells_eroded++;
       const double fact = keq*dt*std::pow(accum[c],meq)/std::pow(length[c],neq);
+      const double hn   = h[n];
       const double h0   = h[c];
+      double hnew       = h0;
       double hp         = h0;
       double diff       = 2*tol;
       while(std::abs(diff)>tol){
-        h[c] -= (h[c]-h0+fact*std::pow(h[c]-h[n],neq))/(1.+fact*neq*std::pow(h[c]-h[n],neq-1));
-        diff  = h[c] - hp;
-        hp    = h[c];
+        hnew -= (hnew-h0+fact*std::pow(hnew-hn,neq))/(1.+fact*neq*std::pow(hnew-hn,neq-1));
+        diff  = hnew - hp;
+        hp    = hnew;
       }
+      h[c] = hnew;
     }
 
     if( istep%20==0 )
