@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <fenv.h> //Used to catch floating point NaN issues
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <limits>
 #include <vector>
@@ -75,16 +76,6 @@ int main(){
   std::vector<int>    stack(  SIZE);
   std::vector<int>    donor(8*SIZE);
 
-  //Each edge node of the DEM is the root of a stack. The `stack_start` array
-  //indicates where these nodes are located in the global stack. This is then
-  //used to induce parallelism. Note that, especially at the beginning of the
-  //program, there may be interior nodes with in depressions or with no local
-  //gradient. These may become the starts of stacks as well, so the
-  //`stack_start` array may be larger than just the perimeter of the DEM.
-  std::vector<int>    stack_start;
-  stack_start.reserve(2*WIDTH+2*HEIGHT);
-  
-
   //Neighbours
   const std::vector<int> nshift= {{-1,-WIDTH-1,-WIDTH,-WIDTH+1,1,WIDTH+1,WIDTH,WIDTH-1}};
   const double SQRT2  = 1.414213562373095048801688724209698078569671875376948;
@@ -109,11 +100,6 @@ int main(){
 
   //! begining of time stepping
   for(int istep=0;istep<nstep;istep++){
-    //The `stack_start` array has an unpredictable size, so we fill it
-    //dynamically and reset it each time. This should have minimal impact on the
-    //algorithm's speed since the memory is not actually reallocated.
-    stack_start.clear();
-
     //! initializing rec and length
     for(int i=0;i<SIZE;i++){
       rec[i]    = i;
@@ -160,14 +146,10 @@ int main(){
       if(rec[c]==c){
         //Make a note that this is the start of a stack. Later we will use these
         //notes to induce parallelism.
-        stack_start.push_back(nstack);
         stack[nstack++] = c;
         find_stack(c,donor,ndon,SIZE,stack,nstack);
       }
     }
-    //We add an additional note to the end of `stack_start` that serves as an
-    //upper bound on the locations of the cells in the final stack. See below.
-    stack_start.push_back(SIZE);
 
     //! computing drainage area
     for(int i=0;i<SIZE;i++)
@@ -202,19 +184,9 @@ int main(){
     //   std::cerr<<length[i]<<" ";
     // std::cerr<<std::endl;
 
-    //! computing erosion
-    #pragma omp parallel        //Spin up the thread team
-    #pragma omp single nowait   //The following for loop is executed by only one thread
-    for(int ss=0;ss<stack_start.size()-1;ss++){
-      //Execute the inner for loop as a task
-      const int sstart = stack_start.at(ss);
-      const int send   = stack_start.at(ss+1);
-      #pragma omp task default(none) shared(stack,rec,accum,length,h) firstprivate(sstart,send)
-      for(int s=sstart;s<send;s++){
-        const int c = stack[s]; //Cell from which flow originates
-        const int n = rec[c];   //Cell receiving the flow
-        if(n==c)
-          continue;
+    std::function<void(const int)> erode_point = [&](const int c) -> void {
+      const int n = rec[c];   //Cell receiving the flow
+      if(n!=c){
         const double fact = keq*dt*std::pow(accum[c],meq)/std::pow(length[c],neq);
         const double h0   = h[c];
         double hp         = h0;
@@ -225,15 +197,38 @@ int main(){
           hp    = h[c];
         }
       }
-    }
 
+      for(int k=0;k<ndon[c];k++)
+        erode_point(donor[8*c+k]);
+
+      // if(ndon[c]>0){
+      //   for(int k=1;k<ndon[c];k++){
+      //     #pragma omp task shared(h)
+      //     ErodePoint(donor[8*c+k],donor,ndon,rec,accum,nshift,h);
+      //   }
+      //   ErodePoint(donor[8*c+0],donor,ndon,rec,accum,nshift,h);
+      // }      
+    };
+
+    //! computing erosion
+    #pragma omp parallel        //Spin up the thread team
+    #pragma omp single nowait   //The following for loop is executed by only one thread
+    for(int c=0;c<SIZE;c++){
+      if(rec[c]==c){
+        //Make a note that this is the start of a stack. Later we will use these
+        //notes to induce parallelism.
+        //#pragma omp task default(none) shared(stack,rec,accum,length,h) firstprivate(sstart,send)
+        erode_point(c);
+      }
+    }
+      
     if( istep%20==0 )
       std::cout<<istep<<std::endl;
       //print*,minval(h),sum(h)/SIZE,maxval(h)
 
   }
 
-  PrintDEM("out_BW+P.dem", h, WIDTH, HEIGHT);
+  PrintDEM("out_BW+TP.dem", h, WIDTH, HEIGHT);
 
   return 0;
 }
