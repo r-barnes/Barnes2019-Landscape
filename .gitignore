@@ -7,3 +7,4 @@ perf.data*
 *.exe
 *.dem
 *.dem.aux.xml
+scorep*
