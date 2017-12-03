@@ -1,3 +1,6 @@
+//This file contains a serial implementation of Braun and Willett's FastScape
+//algorithm. The implementation was developed by adapting Fortran code provided
+//by Braun and attempts to be a faithful reproduction of the ideas therein.
 #include <cmath>
 #include <cstdlib>
 #include <fenv.h> //Used to catch floating point NaN issues
@@ -195,9 +198,6 @@ int main(){
       double hp         = h0;
       double diff       = 2*tol;
       while(std::abs(diff)>tol){
-        //Use Newton's method to solve backward Euler equation. Fix number of loops
-        //to 5, which should be sufficient
-        //for(int i=0;i<5;i++)
         h[c] -= (h[c]-h0+fact*std::pow(h[c]-h[n],neq))/(1.+fact*neq*std::pow(h[c]-h[n],neq-1));
         diff  = h[c] - hp;
         hp    = h[c];
