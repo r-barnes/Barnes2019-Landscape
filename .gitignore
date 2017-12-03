@@ -8,3 +8,5 @@ perf.data*
 *.dem
 *.dem.aux.xml
 scorep*
+refs/
+paper/
