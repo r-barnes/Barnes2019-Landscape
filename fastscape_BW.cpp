@@ -93,7 +93,7 @@ int main(){
   //! generating initial topography
   for(int y=0;y<HEIGHT;y++)
   for(int x=0;x<WIDTH;x++){
-    int c = y*WIDTH+x;
+    const int c = y*WIDTH+x;
     h[c]  = rand()/(double)RAND_MAX;
     if(x == 0 || y==0 || x==WIDTH-1 || y==HEIGHT-1)
       h[c] = 0;
