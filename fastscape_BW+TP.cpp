@@ -58,6 +58,42 @@ void PrintDEM(
 }
 
 
+void ErodePoint(
+  const int c, 
+  const std::vector<double> &accum,
+  const std::vector<double> &length,
+  const std::vector<int>    &rec  ,
+  const std::vector<int>    &ndon ,
+  const std::vector<int>    &stack,
+  const std::vector<int>    &donor,
+  std::vector<double> &h,
+  const int depth
+){
+  const double tol   = 1.e-3;
+
+  const int n = rec[c];   //Cell receiving the flow
+  if(n!=c){
+    const double fact = keq*dt*std::pow(accum[c],meq)/std::pow(length[c],neq);
+    const double h0   = h[c];
+    double hp         = h0;
+    double diff       = 2*tol;
+    while(std::abs(diff)>tol){
+      h[c] -= (h[c]-h0+fact*std::pow(h[c]-h[n],neq))/(1.+fact*neq*std::pow(h[c]-h[n],neq-1));
+      diff  = h[c] - hp;
+      hp    = h[c];
+    }
+  }
+
+  if(ndon[c]>0){
+    for(int k=1;k<ndon[c];k++){
+      const int nk = donor[8*c+k];
+      #pragma omp task default(none) shared(accum,length,rec,ndon,stack,donor,h) firstprivate(nk) if(depth<4)
+      ErodePoint(nk,accum,length,rec,ndon,stack,donor,h,depth+1);
+    }
+    ErodePoint(donor[8*c+0],accum,length,rec,ndon,stack,donor,h,depth+1);
+  }      
+};
+
 
 int main(){
   //feenableexcept(FE_ALL_EXCEPT);
@@ -87,7 +123,6 @@ int main(){
   const double dx    = xl/(WIDTH-1);
   const double dy    = yl/(HEIGHT-1);
   const int    nstep = 120;
-  const double tol   = 1.e-3;
 
   //! generating initial topography
   for(int y=0;y<HEIGHT;y++)
@@ -184,32 +219,6 @@ int main(){
     //   std::cerr<<length[i]<<" ";
     // std::cerr<<std::endl;
 
-    std::function<void(const int)> erode_point = [&](const int c) -> void {
-      const int n = rec[c];   //Cell receiving the flow
-      if(n!=c){
-        const double fact = keq*dt*std::pow(accum[c],meq)/std::pow(length[c],neq);
-        const double h0   = h[c];
-        double hp         = h0;
-        double diff       = 2*tol;
-        while(std::abs(diff)>tol){
-          h[c] -= (h[c]-h0+fact*std::pow(h[c]-h[n],neq))/(1.+fact*neq*std::pow(h[c]-h[n],neq-1));
-          diff  = h[c] - hp;
-          hp    = h[c];
-        }
-      }
-
-      for(int k=0;k<ndon[c];k++)
-        erode_point(donor[8*c+k]);
-
-      // if(ndon[c]>0){
-      //   for(int k=1;k<ndon[c];k++){
-      //     #pragma omp task shared(h)
-      //     ErodePoint(donor[8*c+k],donor,ndon,rec,accum,nshift,h);
-      //   }
-      //   ErodePoint(donor[8*c+0],donor,ndon,rec,accum,nshift,h);
-      // }      
-    };
-
     //! computing erosion
     #pragma omp parallel        //Spin up the thread team
     #pragma omp single nowait   //The following for loop is executed by only one thread
@@ -217,8 +226,8 @@ int main(){
       if(rec[c]==c){
         //Make a note that this is the start of a stack. Later we will use these
         //notes to induce parallelism.
-        //#pragma omp task default(none) shared(stack,rec,accum,length,h) firstprivate(sstart,send)
-        erode_point(c);
+        #pragma omp task default(none) shared(accum,length,rec,ndon,stack,donor,h) firstprivate(c)
+        ErodePoint(c,accum,length,rec,ndon,stack,donor,h,0);
       }
     }
       
