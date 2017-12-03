@@ -171,21 +171,21 @@ int main(){
       h[c] += ueq*dt;
     }
 
-    std::cout<<"rec: ";
-    for(int c=3*WIDTH;c<4*WIDTH;c++){
-      if(rec[c]==c)
-        std::cout<<-1<<" ";
-      else
-        std::cout<<rec[c]<<" ";
-    }
-    std::cout<<std::endl;
+    // std::cout<<"rec: ";
+    // for(int c=3*WIDTH;c<4*WIDTH;c++){
+    //   if(rec[c]==c)
+    //     std::cout<<-1<<" ";
+    //   else
+    //     std::cout<<rec[c]<<" ";
+    // }
+    // std::cout<<std::endl;
+
+    // std::cerr<<"length: ";
+    // for(int i=3*WIDTH;i<4*WIDTH;i++)
+    //   std::cerr<<length[i]<<" ";
+    // std::cerr<<std::endl;
 
     //! computing erosion
-    std::cerr<<"length: ";
-    for(int i=3*WIDTH;i<4*WIDTH;i++)
-      std::cerr<<length[i]<<" ";
-    std::cerr<<std::endl;
-
     for(int s=0;s<SIZE;s++){
       cells_processed++;
       const int c = stack[s]; //Cell from which flow originates
@@ -213,7 +213,7 @@ int main(){
   std::cout<<"Cells processed = "<<cells_processed<<std::endl;
   std::cout<<"Cells eroded = "<<cells_eroded<<std::endl;
 
-  PrintDEM("out.dem", h, WIDTH, HEIGHT);
+  PrintDEM("out_BW.dem", h, WIDTH, HEIGHT);
 
   return 0;
 }
