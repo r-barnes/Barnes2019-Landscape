@@ -10,35 +10,13 @@
 #include <vector>
 #include <iomanip>
 #include "CumulativeTimer.hpp"
+#include "Timer.hpp"
 
-const double keq = 2e-6;
-const double neq = 2;
-const double meq = 0.8;
-const double ueq = 2e-3;
-const double dt  = 1000.;
-
-constexpr double DINFTY  = std::numeric_limits<double>::infinity();
-const     int    NO_FLOW = -1;
-
-void find_stack(
-  const int c, 
-  const std::vector<int> &donor,
-  const std::vector<int> &ndon,
-  int SIZE, 
-  std::vector<int> &stack,
-  int &nstack
-){
-  for(int k=0;k<ndon[c];k++){
-    int n           = donor[8*c+k];
-    stack[nstack++] = n;
-    find_stack(n,donor,ndon,SIZE,stack,nstack);
-  }
-}
 
 
 void PrintDEM(
   const std::string filename, 
-  const std::vector<double> &h,
+  const double *const h,
   const int width,
   const int height
 ){
@@ -58,7 +36,38 @@ void PrintDEM(
 
 
 
-int main(){
+class FastScape_BW {
+ private:
+  static constexpr double DINFTY  = std::numeric_limits<double>::infinity();
+
+  const int    NO_FLOW = -1;
+  const double SQRT2   = 1.414213562373095048801688724209698078569671875376948;
+
+
+ public:
+  const double keq       = 2e-6;
+  const double neq       = 2;
+  const double meq       = 0.8;
+  const double ueq       = 2e-3;
+  const double dt        = 1000.;
+  const double dr[8]     = {1,SQRT2,1,SQRT2,1,SQRT2,1,SQRT2};  
+  const double tol       = 1e-3;
+  const double cell_area = 40000;
+
+
+ private:
+  int width;
+  int height;
+  int size;
+
+  double *h;
+  double *accum;
+  int    *rec;
+  int    *ndon;
+  int    *stack;
+  int    *donor;
+  int    nshift[8];
+
   CumulativeTimer Tmr_Step1_Initialize;
   CumulativeTimer Tmr_Step2_DetermineReceivers;
   CumulativeTimer Tmr_Step3_DetermineDonors;
@@ -68,158 +77,135 @@ int main(){
   CumulativeTimer Tmr_Step7_Erosion;
   CumulativeTimer Tmr_Overall;
 
-  Tmr_Overall.start();
 
-  //feenableexcept(FE_ALL_EXCEPT);
-
-  //! defining size of the problem
-  const int WIDTH  = 501;
-  const int HEIGHT = 501;
-  const int SIZE   = WIDTH*HEIGHT;
-
-  //!    allocating memory
-  std::vector<double> h    (  SIZE);
-  std::vector<double> accum(  SIZE);
-  std::vector<double> length( SIZE);
-  std::vector<int>    rec  (  SIZE);
-  std::vector<int>    ndon (  SIZE);
-  std::vector<int>    stack(  SIZE);
-  std::vector<int>    donor(8*SIZE);
-  
-
-  //Neighbours
-  const std::vector<int> nshift= {{-1,-WIDTH-1,-WIDTH,-WIDTH+1,1,WIDTH+1,WIDTH,WIDTH-1}};
-  const double SQRT2  = 1.414213562373095048801688724209698078569671875376948;
-  const double dr[8]  = {1,SQRT2,1,SQRT2,1,SQRT2,1,SQRT2};
-
-  //defining geometrical and temporal constants
-  const double xl    = 100.e3;
-  const double yl    = 100.e3;
-  const double dx    = xl/(WIDTH-1);
-  const double dy    = yl/(HEIGHT-1);
-  const int    nstep = 120;
-  const double tol   = 1.e-3;
-
-  //! generating initial topography
-  Tmr_Step1_Initialize.start();
-  for(int y=0;y<HEIGHT;y++)
-  for(int x=0;x<WIDTH;x++){
-    const int c = y*WIDTH+x;
-    h[c]  = rand()/(double)RAND_MAX;
-    if(x == 0 || y==0 || x==WIDTH-1 || y==HEIGHT-1)
-      h[c] = 0;
-  }
-  Tmr_Step1_Initialize.stop();  
-
-
-  //! begining of time stepping
-  for(int istep=0;istep<nstep;istep++){
-
-    //! initializing rec and length
-    Tmr_Step2_DetermineReceivers.start();
-    for(int i=0;i<SIZE;i++){
-      rec[i]    = i;
-      length[i] = 0;
+ private:
+  void GenerateRandomTerrain(){
+    //srand(std::random_device()());
+    for(int y=0;y<height;y++)
+    for(int x=0;x<width;x++){
+      const int c = y*width+x;
+      h[c]  = rand()/(double)RAND_MAX;
+      if(x == 0 || y==0 || x==width-1 || y==height-1)
+        h[c] = 0;
     }
+  }  
 
+
+ public:
+  FastScape_BW(const int width0, const int height0)
+    : nshift{-1,-width0-1,-width0,-width0+1,1,width0+1,width0,width0-1}
+  {
+    Tmr_Overall.start();
+    Tmr_Step1_Initialize.start();
+    width  = width0;
+    height = height0;
+    size   = width*height;
+
+    h      = new double[size];
+
+    GenerateRandomTerrain();
+
+    Tmr_Step1_Initialize.stop();
+    Tmr_Overall.stop();
+  }
+
+  ~FastScape_BW(){
+    delete[] h;
+  }
+
+
+ private:
+  void ComputeReceivers(){
     //! computing receiver array
-    for(int y=1;y<HEIGHT-1;y++)
-    for(int x=1;x<WIDTH-1;x++){
-      const int c      = y*WIDTH+x;
+    for(int y=1;y<height-1;y++)
+    for(int x=1;x<width-1;x++){
+      const int c      = y*width+x;
       double max_slope = -DINFTY;
       int    max_n     = 0;
-      double slope_n   = 0;
       for(int n=0;n<8;n++){
         double slope = (h[c] - h[c+nshift[n]])/dr[n];
         if(slope>max_slope){
           max_slope = slope;
           max_n     = n;
-          slope_n   = dr[n];
         }
       }
-      if(max_slope>-DINFTY){
-        rec[c]    = c+nshift[max_n];
-        length[c] = slope_n;
-      }
-    }
-    Tmr_Step2_DetermineReceivers.stop();
+      if(max_slope>-DINFTY)
+        rec[c] = max_n;
+      else
+        rec[c] = c;
+    }   
+  }
 
 
+  void ComputeDonors(){
     //! initialising number of donors per node to 0
-    Tmr_Step3_DetermineDonors.start();    
-    for(int i=0;i<SIZE;i++)
+    for(int i=0;i<size;i++)
       ndon[i] = 0;
 
     //! computing donor arrays
-    for(int c=0;c<SIZE;c++){
-      if(rec[c]==c)
+    for(int c=0;c<size;c++){
+      if(rec[c]==NO_FLOW)
         continue;
-      const int n        = rec[c];
+      const int n        = c+nshift[rec[c]];
       donor[8*n+ndon[n]] = c;
       ndon[n]++;
     }
-    Tmr_Step3_DetermineDonors.stop();
+  }
 
 
-    //! computing stack
-    Tmr_Step4_GenerateStack.start();    
+  void FindStack(const int c, int &nstack){
+    for(int k=0;k<ndon[c];k++){
+      int n           = donor[8*c+k];
+      stack[nstack++] = n;
+      FindStack(n,nstack);
+    }
+  }
+
+
+  void GenerateStack(){
     int nstack=0;
-    for(int c=0;c<SIZE;c++){
-      if(rec[c]==c){
+    for(int c=0;c<size;c++){
+      if(rec[c]==NO_FLOW){
         stack[nstack++] = c;
-        find_stack(c,donor,ndon,SIZE,stack,nstack);
+        FindStack(c,nstack);
       }
-    }
-    Tmr_Step4_GenerateStack.stop();
+    }  
+  }
 
 
+  void ComputeDraingeArea(){
     //! computing drainage area
-    Tmr_Step5_FlowAcc.start();    
-    for(int i=0;i<SIZE;i++)
-      accum[i] = dx*dy;
+    for(int i=0;i<size;i++)
+      accum[i] = cell_area;
 
-    for(int s=SIZE-1;s>=0;s--){
+    for(int s=size-1;s>=0;s--){
       const int c = stack[s];
-      if(rec[c]!=c){
-        const int n = rec[c];
-        accum[n] += accum[c];
+      if(rec[c]!=NO_FLOW){
+        const int n = c+nshift[rec[c]];
+        accum[n]   += accum[c];
       }
-    }
-    Tmr_Step5_FlowAcc.stop();
+    }   
+  } 
 
 
+  void AddUplift(){
     //! adding uplift to landscape
-    Tmr_Step6_Uplift.start();    
-    for(int y=1;y<HEIGHT-1;y++)
-    for(int x=1;x<WIDTH-1;x++){
-      int c = y*WIDTH+x;
+    for(int y=1;y<height-1;y++)
+    for(int x=1;x<width-1;x++){
+      const int c = y*width+x;
       h[c] += ueq*dt;
-    }
-    Tmr_Step6_Uplift.stop();
+    }    
+  }
 
 
-    // std::cout<<"rec: ";
-    // for(int c=3*WIDTH;c<4*WIDTH;c++){
-    //   if(rec[c]==c)
-    //     std::cout<<-1<<" ";
-    //   else
-    //     std::cout<<rec[c]<<" ";
-    // }
-    // std::cout<<std::endl;
-
-    // std::cerr<<"length: ";
-    // for(int i=3*WIDTH;i<4*WIDTH;i++)
-    //   std::cerr<<length[i]<<" ";
-    // std::cerr<<std::endl;
-
-    //! computing erosion
-    Tmr_Step7_Erosion.start();    
-    for(int s=0;s<SIZE;s++){
-      const int c = stack[s]; //Cell from which flow originates
-      const int n = rec[c];   //Cell receiving the flow
-      if(n==c)
+  void StackErode(){
+    for(int s=0;s<size;s++){
+      const int c = stack[s];           //Cell from which flow originates
+      if(rec[c]==NO_FLOW)
         continue;
-      const double fact = keq*dt*std::pow(accum[c],meq)/std::pow(length[c],neq);
+      const int n = c+nshift[rec[c]];   //Cell receiving the flow
+
+      const double fact = keq*dt*std::pow(accum[c],meq)/std::pow(dr[rec[c]],neq);
       const double hn   = h[n];
       const double h0   = h[c];
       double hnew       = h0;
@@ -231,26 +217,79 @@ int main(){
         hp    = hnew;
       }
       h[c] = hnew;
-    }
-    Tmr_Step7_Erosion.stop();
-
-    if( istep%20==0 )
-      std::cout<<istep<<std::endl;
-      //print*,minval(h),sum(h)/SIZE,maxval(h)
-
+    }  
   }
 
-  std::cout<<"t Step1: Initialize         = "<<std::setw(15)<<Tmr_Step1_Initialize.elapsed()         <<" microseconds"<<std::endl;                 
-  std::cout<<"t Step2: DetermineReceivers = "<<std::setw(15)<<Tmr_Step2_DetermineReceivers.elapsed() <<" microseconds"<<std::endl;                         
-  std::cout<<"t Step3: DetermineDonors    = "<<std::setw(15)<<Tmr_Step3_DetermineDonors.elapsed()    <<" microseconds"<<std::endl;                      
-  std::cout<<"t Step4: GenerateStack      = "<<std::setw(15)<<Tmr_Step4_GenerateStack.elapsed()      <<" microseconds"<<std::endl;                    
-  std::cout<<"t Step5: FlowAcc            = "<<std::setw(15)<<Tmr_Step5_FlowAcc.elapsed()            <<" microseconds"<<std::endl;              
-  std::cout<<"t Step6: Uplift             = "<<std::setw(15)<<Tmr_Step6_Uplift.elapsed()             <<" microseconds"<<std::endl;             
-  std::cout<<"t Step7: Erosion            = "<<std::setw(15)<<Tmr_Step7_Erosion.elapsed()            <<" microseconds"<<std::endl;              
-  std::cout<<"t Overall                   = "<<std::setw(15)<<Tmr_Overall.elapsed()                  <<" microseconds"<<std::endl;        
+
+ public:
+  void run(const int nstep){
+    Tmr_Overall.start();
+
+    Tmr_Step1_Initialize.start();
+
+    accum  = new double[size];
+    rec    = new int[size];
+    ndon   = new int[size];
+    stack  = new int[size];
+    donor  = new int[8*size];
+
+    //! initializing rec
+    for(int i=0;i<size;i++)
+      rec[i] = NO_FLOW;
+
+    Tmr_Step1_Initialize.stop();
+
+    for(int step=0;step<=nstep;step++){
+      Tmr_Step2_DetermineReceivers.start ();   ComputeReceivers  (); Tmr_Step2_DetermineReceivers.stop ();
+      Tmr_Step3_DetermineDonors.start    ();   ComputeDonors     (); Tmr_Step3_DetermineDonors.stop    ();
+      Tmr_Step4_GenerateStack.start      ();   GenerateStack     (); Tmr_Step4_GenerateStack.stop      ();
+      Tmr_Step5_FlowAcc.start            ();   ComputeDraingeArea(); Tmr_Step5_FlowAcc.stop            ();
+      Tmr_Step6_Uplift.start             ();   AddUplift         (); Tmr_Step6_Uplift.stop             ();
+      Tmr_Step7_Erosion.start            ();   StackErode        (); Tmr_Step7_Erosion.stop            ();
+
+      if( step%20==0 )
+        std::cout<<step<<std::endl;
+    }
+
+    delete[] accum;
+    delete[] rec;
+    delete[] ndon;
+    delete[] stack;
+    delete[] donor;
+
+    Tmr_Overall.stop();
+
+    std::cout<<"t Step1: Initialize         = "<<std::setw(15)<<Tmr_Step1_Initialize.elapsed()         <<" microseconds"<<std::endl;                 
+    std::cout<<"t Step2: DetermineReceivers = "<<std::setw(15)<<Tmr_Step2_DetermineReceivers.elapsed() <<" microseconds"<<std::endl;                         
+    std::cout<<"t Step3: DetermineDonors    = "<<std::setw(15)<<Tmr_Step3_DetermineDonors.elapsed()    <<" microseconds"<<std::endl;                      
+    std::cout<<"t Step4: GenerateStack      = "<<std::setw(15)<<Tmr_Step4_GenerateStack.elapsed()      <<" microseconds"<<std::endl;                    
+    std::cout<<"t Step5: FlowAcc            = "<<std::setw(15)<<Tmr_Step5_FlowAcc.elapsed()            <<" microseconds"<<std::endl;              
+    std::cout<<"t Step6: Uplift             = "<<std::setw(15)<<Tmr_Step6_Uplift.elapsed()             <<" microseconds"<<std::endl;             
+    std::cout<<"t Step7: Erosion            = "<<std::setw(15)<<Tmr_Step7_Erosion.elapsed()            <<" microseconds"<<std::endl;              
+    std::cout<<"t Overall                   = "<<std::setw(15)<<Tmr_Overall.elapsed()                  <<" microseconds"<<std::endl;        
+  }
+  
+
+  double* getH() const {
+    return h;
+  }
+};
 
 
-  PrintDEM("out_BW.dem", h, WIDTH, HEIGHT);
+
+int main(){
+  //feenableexcept(FE_ALL_EXCEPT);
+
+  const int width  = 501;
+  const int height = 501;
+  const int nstep  = 120;
+
+  Timer tmr;
+  FastScape_BW tm(width,height);
+  tm.run(nstep);
+  std::cout<<"Calculation time = "<<tmr.elapsed()<<std::endl;
+
+  PrintDEM("out_BW_class.dem", tm.getH(), width, height);
 
   return 0;
 }
