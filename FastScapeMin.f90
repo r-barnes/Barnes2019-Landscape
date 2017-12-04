@@ -33,7 +33,7 @@ xl=100.e3;yl=100.e3
 dx=xl/(nx-1);dy=yl/(ny-1)
 dt=10000.
 dt=1000.
-nstep=1
+nstep=120
 !nstep=1000
 nfreq=10
 
@@ -140,7 +140,6 @@ tol=1.e-3
 
     do ij=1,nn
     ijk=stack(ij)
-    print*,ijk
     ijr=rec(ijk)
       if (ijr.ne.ijk) then
       fact=k*dt*a(ijk)**m/length(ijk)**n
