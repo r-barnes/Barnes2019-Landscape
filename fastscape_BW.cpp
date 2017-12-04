@@ -45,6 +45,9 @@ class FastScape_BW {
 
 
  public:
+  //NOTE: Having these constants specified in the class rather than globally
+  //results in a significant speed loss. However, it is better to have them here
+  //under the assumption that they'd be dynamic in a real implementation.
   const double keq       = 2e-6;
   const double neq       = 2;
   const double meq       = 0.8;
@@ -268,7 +271,7 @@ class FastScape_BW {
     std::cout<<"t Step7: Erosion            = "<<std::setw(15)<<Tmr_Step7_Erosion.elapsed()            <<" microseconds"<<std::endl;              
     std::cout<<"t Overall                   = "<<std::setw(15)<<Tmr_Overall.elapsed()                  <<" microseconds"<<std::endl;        
   }
-  
+
 
   double* getH() const {
     return h;
