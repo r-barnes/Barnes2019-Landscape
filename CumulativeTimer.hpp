@@ -1,5 +1,5 @@
-#ifndef _timer_hpp_
-#define _timer_hpp_
+#ifndef _cumulative_timer_hpp_
+#define _cumulative_timer_hpp_
 
 #include <chrono>
 #include <cstdint>
