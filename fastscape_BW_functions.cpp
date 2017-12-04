@@ -220,6 +220,7 @@ class FastScape_BW {
     }  
   }
 
+
  public:
   void run(const int nstep){
     Tmr_Overall.start();
@@ -246,13 +247,6 @@ class FastScape_BW {
       Tmr_Step6_Uplift.start             ();   AddUplift         (); Tmr_Step6_Uplift.stop             ();
       Tmr_Step7_Erosion.start            ();   StackErode        (); Tmr_Step7_Erosion.stop            ();
 
-
-
-
-
-
-
-
       if( step%20==0 )
         std::cout<<step<<std::endl;
     }
@@ -274,6 +268,7 @@ class FastScape_BW {
     std::cout<<"t Step7: Erosion            = "<<std::setw(15)<<Tmr_Step7_Erosion.elapsed()            <<" microseconds"<<std::endl;              
     std::cout<<"t Overall                   = "<<std::setw(15)<<Tmr_Overall.elapsed()                  <<" microseconds"<<std::endl;        
   }
+  
 
   double* getH() const {
     return h;
