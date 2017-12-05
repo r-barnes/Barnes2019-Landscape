@@ -68,6 +68,11 @@ class FastScape_RB {
   int    *stack;    //Indices of cells in the order they should be processed
   int    nshift[8]; //Offset from a focal cell's index to its neighbours
 
+  //nshift offsets:
+  //1 2 3
+  //0   4
+  //7 6 5
+
   int    *levels;   //Indices of locations in stack where a level begins and ends
   int    nlevel;    //Number of levels used
   int    nstack;    //Number of levels used in the stack
