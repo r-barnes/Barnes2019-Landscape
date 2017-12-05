@@ -59,7 +59,6 @@ class FastScape_RBP {
   int width;        //Width of DEM
   int height;       //Height of DEM
   int size;         //Size of DEM (width*height)
-  int intsize;      //Size of DEM minus boundary `(width-2)*(height-2)`
 
   double *h;        //Digital elevation model (height)
   double *accum;    //Flow accumulation at each point
