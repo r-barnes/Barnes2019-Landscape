@@ -123,8 +123,8 @@ class FastScape_BW {
     for(int y=1;y<height-1;y++)
     for(int x=1;x<width-1;x++){
       const int c      = y*width+x;
-      double max_slope = -DINFTY;
-      int    max_n     = 0;
+      double max_slope = -DINFTY; //TODO: Wrong, in the case of flats
+      int    max_n     = NO_FLOW;
       for(int n=0;n<8;n++){
         double slope = (h[c] - h[c+nshift[n]])/dr[n];
         if(slope>max_slope){
@@ -132,10 +132,7 @@ class FastScape_BW {
           max_n     = n;
         }
       }
-      if(max_slope>-DINFTY)
         rec[c] = max_n;
-      else
-        rec[c] = c;
     }   
   }
 
@@ -201,19 +198,20 @@ class FastScape_BW {
   }
 
 
-  void StackErode(){
+  void Erode(){
     for(int s=0;s<size;s++){
       const int c = stack[s];           //Cell from which flow originates
       if(rec[c]==NO_FLOW)
         continue;
       const int n = c+nshift[rec[c]];   //Cell receiving the flow
 
-      const double fact = keq*dt*std::pow(accum[c],meq)/std::pow(dr[rec[c]],neq);
-      const double hn   = h[n];
-      const double h0   = h[c];
-      double hnew       = h0;
-      double hp         = h0;
-      double diff       = 2*tol;
+      const double length = dr[rec[c]];
+      const double fact   = keq*dt*std::pow(accum[c],meq)/std::pow(length,neq);
+      const double h0     = h[c];      //Elevation of focal cell
+      const double hn     = h[n];      //Elevation of neighbouring (receiving, lower) cell
+      double hnew         = h0;        //Current updated value of focal cell
+      double hp           = h0;        //Previous updated value of focal cell
+      double diff         = 2*tol;     //Difference between current and previous updated values
       while(std::abs(diff)>tol){
         hnew -= (hnew-h0+fact*std::pow(hnew-hn,neq))/(1.+fact*neq*std::pow(hnew-hn,neq-1));
         diff  = hnew - hp;
@@ -248,7 +246,7 @@ class FastScape_BW {
       Tmr_Step4_GenerateStack.start      ();   GenerateStack     (); Tmr_Step4_GenerateStack.stop      ();
       Tmr_Step5_FlowAcc.start            ();   ComputeDraingeArea(); Tmr_Step5_FlowAcc.stop            ();
       Tmr_Step6_Uplift.start             ();   AddUplift         (); Tmr_Step6_Uplift.stop             ();
-      Tmr_Step7_Erosion.start            ();   StackErode        (); Tmr_Step7_Erosion.stop            ();
+      Tmr_Step7_Erosion.start            ();   Erode             (); Tmr_Step7_Erosion.stop            ();
 
       if( step%20==0 )
         std::cout<<step<<std::endl;
@@ -277,6 +275,10 @@ class FastScape_BW {
     return h;
   }
 };
+
+
+
+
 
 
 
