@@ -5,24 +5,15 @@
 #include <iostream>
 #include <limits>
 #include <vector>
-#include <array>
-
-const double keq = 2e-6;
-const double neq = 2;
-const double meq = 0.8;
-const double ueq = 2e-3;
-const double dt  = 1000.;
-
-constexpr double DINFTY  = std::numeric_limits<double>::infinity();
-
-const double SQRT2  = 1.414213562373095048801688724209698078569671875376948;
-const double dr[8]  = {1,SQRT2,1,SQRT2,1,SQRT2,1,SQRT2};
+#include <iomanip>
+#include "CumulativeTimer.hpp"
+#include "Timer.hpp"
 
 
 
 void PrintDEM(
   const std::string filename, 
-  const std::vector<double> &h,
+  const double *const h,
   const int width,
   const int height
 ){
@@ -42,36 +33,97 @@ void PrintDEM(
 
 
 
-class TerrainMorpher {
+class FastScape_RB {
+ private:
+  static constexpr double DINFTY  = std::numeric_limits<double>::infinity();
+
+  const int    NO_FLOW = -1;
+  const double SQRT2   = 1.414213562373095048801688724209698078569671875376948;
+
+
  public:
-  std::vector<double> h;
+  //NOTE: Having these constants specified in the class rather than globally
+  //results in a significant speed loss. However, it is better to have them here
+  //under the assumption that they'd be dynamic in a real implementation.
+  const double keq       = 2e-6;
+  const double neq       = 2;
+  const double meq       = 0.8;
+  const double ueq       = 2e-3;
+  const double dt        = 1000.;
+  const double dr[8]     = {1,SQRT2,1,SQRT2,1,SQRT2,1,SQRT2};  
+  const double tol       = 1e-3;
+  const double cell_area = 40000;
+
 
  private:
-  static const int NO_FLOW = -1;
-
   int width;
   int height;
   int size;
 
-  std::vector<double>       accum;
-  std::vector<int>          rec;
-  std::vector<unsigned int> ndon;
-  std::vector<unsigned int> stack;
-  std::vector<unsigned int> donor;
-  std::vector<unsigned int> levels;
+  double *h;        //Digital elevation model (height)
+  double *accum;    //Flow accumulation at each point
+  int    *rec;      //Index of receiving cell
+  int    *donor;    //Indices of a cell's donor cells
+  int    *ndon;     //How many donors a cell has
+  int    *stack;    //Indices of cells in the order they should be processed
+  int    nshift[8]; //Offset from a focal cell's index to its neighbours
+
+  int    *levels;   //Indices of locations in stack where a level begins and ends
+  int    nlevel;    //Number of levels used
   
-  std::array<int,8> nshift;
+  CumulativeTimer Tmr_Step1_Initialize;
+  CumulativeTimer Tmr_Step2_DetermineReceivers;
+  CumulativeTimer Tmr_Step3_DetermineDonors;
+  CumulativeTimer Tmr_Step4_GenerateStack;
+  CumulativeTimer Tmr_Step5_FlowAcc;
+  CumulativeTimer Tmr_Step6_Uplift;
+  CumulativeTimer Tmr_Step7_Erosion;
+  CumulativeTimer Tmr_Overall;
 
+
+ private:
+  void GenerateRandomTerrain(){
+    //srand(std::random_device()());
+    for(int y=0;y<height;y++)
+    for(int x=0;x<width;x++){
+      const int c = y*width+x;
+      h[c]  = rand()/(double)RAND_MAX;
+      if(x == 0 || y==0 || x==width-1 || y==height-1)
+        h[c] = 0;
+    }
+  }  
+
+
+ public:
+  FastScape_RB(const int width0, const int height0)
+    : nshift{-1,-width0-1,-width0,-width0+1,1,width0+1,width0,width0-1}
+  {
+    Tmr_Overall.start();
+    Tmr_Step1_Initialize.start();
+    width  = width0;
+    height = height0;
+    size   = width*height;
+
+    h      = new double[size];
+
+    GenerateRandomTerrain();
+
+    Tmr_Step1_Initialize.stop();
+    Tmr_Overall.stop();
+  }
+
+  ~FastScape_RB(){
+    delete[] h;
+  }
+
+
+ private:
   void ComputeReceivers(){
-    //! initializing rec and length
-    for(int i=0;i<size;i++)
-      rec[i] = NO_FLOW;
-
     //! computing receiver array
     for(int y=1;y<height-1;y++)
     for(int x=1;x<width-1;x++){
       const int c      = y*width+x;
-      double max_slope = -DINFTY;
+      double max_slope = -DINFTY; //TODO: Wrong, in the case of flats
       int    max_n     = NO_FLOW;
       for(int n=0;n<8;n++){
         double slope = (h[c] - h[c+nshift[n]])/dr[n];
@@ -84,6 +136,7 @@ class TerrainMorpher {
     }    
   }
 
+
   void ComputeDonors(){
     //! initialising number of donors per node to 0
     for(int i=0;i<size;i++)
@@ -93,50 +146,45 @@ class TerrainMorpher {
     for(int c=0;c<size;c++){
       if(rec[c]==NO_FLOW)
         continue;
-      const int n        = c+nshift[rec[c]];
+      const auto n       = c+nshift[rec[c]];
       donor[8*n+ndon[n]] = c;
       ndon[n]++;
     }    
   }
 
-  void GenerateStack(){
-    unsigned int nstack = 0;
-    unsigned int qpoint = 0;
+  void GenerateQueue(){
+    int nstack = 0;
+    int qpoint = 0;
 
-    levels.clear();
-    levels.push_back(0);
+    levels[0] = 0;
+    nlevel    = 1;
 
     //Load cells without dependencies into the queue
     for(int c=0;c<size;c++){
       if(rec[c]==NO_FLOW)
         stack[nstack++] = c;
     }
-    levels.push_back(nstack); //Last cell of this level
+    levels[nlevel++] = nstack; //Last cell of this level
 
     while(qpoint<nstack){
       const auto c = stack[qpoint];
-      for(unsigned int k=0;k<ndon[c];k++){
+      for(int k=0;k<ndon[c];k++){
         const auto n    = donor[8*c+k];
         stack[nstack++] = n;
       }
 
+      //TODO: What's this about, then?
       qpoint++;
-      if(qpoint==levels.back() && nstack!=levels.back())
-        levels.push_back(nstack); //Starting a new level      
+      if(qpoint==levels[nlevel-1] && nstack!=levels[nlevel-1])
+        levels[nlevel++] = nstack; //Starting a new level      
     }
     // std::cerr<<"nstack final = "<<nstack<<std::endl;
   }
 
   void ComputeDraingeArea(){
-    const double xl   = 100.e3;
-    const double yl   = 100.e3;
-    const double dx   = xl/(width-1);
-    const double dy   = yl/(height-1);
-    const double area = dx*dy;
-
     //! computing drainage area
     for(int i=0;i<size;i++)
-      accum[i] = area;
+      accum[i] = cell_area;
 
     for(int s=size-1;s>=0;s--){
       const int c = stack[s];
@@ -147,6 +195,7 @@ class TerrainMorpher {
     }    
   }
 
+
   void AddUplift(){
     //! adding uplift to landscape
     for(int y=1;y<height-1;y++)
@@ -156,25 +205,23 @@ class TerrainMorpher {
     }    
   }
 
+
   void Erode(){
-    for(unsigned int li=0;li<levels.size()-1;li++){
-      const int levelsize = levels[li+1]-levels[li];
-      for(unsigned int si=levels[li];si<levels[li+1];si++){
+    for(int li=0;li<nlevel-1;li++){
+      for(int si=levels[li];si<levels[li+1];si++){
         const int c = stack[si]; //Cell from which flow originates
         if(rec[c]==NO_FLOW)
           continue;
         const int n = c+nshift[rec[c]];   //Cell receiving the flow
+
         const double length = dr[rec[c]];
         const double fact   = keq*dt*std::pow(accum[c],meq)/std::pow(length,neq);
-        const double h0     = h[c];
-        const double hn     = h[n];
-        double hp           = h0;
-        double diff         = 2*tol;
-        double hnew         = h0;
+        const double h0     = h[c];      //Elevation of focal cell
+        const double hn     = h[n];      //Elevation of neighbouring (receiving, lower) cell
+        double hnew         = h0;        //Current updated value of focal cell
+        double hp           = h0;        //Previous updated value of focal cell
+        double diff         = 2*tol;     //Difference between current and previous updated values
         while(std::abs(diff)>tol){
-          //Use Newton's method to solve backward Euler equation. Fix number of loops
-          //to 5, which should be sufficient
-          //for(int i=0;i<5;i++)
           hnew -= (hnew-h0+fact*std::pow(hnew-hn,neq))/(1.+fact*neq*std::pow(hnew-hn,neq-1));
           diff  = hnew - hp;
           hp    = hnew;
@@ -184,60 +231,70 @@ class TerrainMorpher {
     }
   }
 
- public:
-  const double tol = 1.e-3;
 
  public:
-  TerrainMorpher(const int width0, const int height0){
-    width  = width0;
-    height = height0;
-    size   = width*height;
-
-    h.resize    (  size);
-    accum.resize(  size);
-    rec.resize  (  size);
-    ndon.resize (  size);
-    stack.resize(  size);
-    donor.resize(8*size);
-
-    nshift = {{-1,-width-1,-width,-width+1,1,width+1,width,width-1}};
-  }
-
-  void generateRandomTerrain(){
-    for(int y=0;y<height;y++)
-    for(int x=0;x<width;x++){
-      const int c = y*width+x;
-      h[c]  = rand()/(double)RAND_MAX;
-      if(x == 0 || y==0 || x==width-1 || y==height-1)
-        h[c] = 0;
-    }
-  }
-
   void run(const int nstep){
-    //! begining of time stepping
-    for(int istep=0;istep<nstep;istep++){
+    Tmr_Overall.start();
 
-      ComputeReceivers();
+    Tmr_Step1_Initialize.start();
 
-      ComputeDonors();
+    accum  = new double[size];
+    rec    = new int[size];
+    ndon   = new int[size];
+    stack  = new int[size];
+    donor  = new int[8*size];
 
-      GenerateStack();
+    //It's difficult to know how much memory should be allocated for levels. For
+    //a square DEM with isotropic dispersion this is approximately sqrt(E/2). A
+    //diagonally tilted surface with isotropic dispersion may have sqrt(E)
+    //levels. A tortorously sinuous river may have up to E*E levels. We
+    //compromise and choose a number of levels equal to the perimiter because
+    //why not?
+    levels = new int[size]; //TODO: Make smaller to `2*width+2*height`
 
-      ComputeDraingeArea();
+    //! initializing rec
+    for(int i=0;i<size;i++)
+      rec[i] = NO_FLOW;
 
-      AddUplift();
+    Tmr_Step1_Initialize.stop();
+
+    for(int step=0;step<=nstep;step++){
+      Tmr_Step2_DetermineReceivers.start ();   ComputeReceivers  (); Tmr_Step2_DetermineReceivers.stop ();
+      Tmr_Step3_DetermineDonors.start    ();   ComputeDonors     (); Tmr_Step3_DetermineDonors.stop    ();
+      Tmr_Step4_GenerateStack.start      ();   GenerateQueue     (); Tmr_Step4_GenerateStack.stop      ();
+      Tmr_Step5_FlowAcc.start            ();   ComputeDraingeArea(); Tmr_Step5_FlowAcc.stop            ();
+      Tmr_Step6_Uplift.start             ();   AddUplift         (); Tmr_Step6_Uplift.stop             ();
+      Tmr_Step7_Erosion.start            ();   Erode             (); Tmr_Step7_Erosion.stop            ();
+
+      if( step%20==0 )
+        std::cout<<step<<std::endl;
+    }
+
+    delete[] accum;
+    delete[] rec;
+    delete[] ndon;
+    delete[] stack;
+    delete[] donor;
+
+    Tmr_Overall.stop();
+
+    std::cout<<"t Step1: Initialize         = "<<std::setw(15)<<Tmr_Step1_Initialize.elapsed()         <<" microseconds"<<std::endl;                 
+    std::cout<<"t Step2: DetermineReceivers = "<<std::setw(15)<<Tmr_Step2_DetermineReceivers.elapsed() <<" microseconds"<<std::endl;                         
+    std::cout<<"t Step3: DetermineDonors    = "<<std::setw(15)<<Tmr_Step3_DetermineDonors.elapsed()    <<" microseconds"<<std::endl;                      
+    std::cout<<"t Step4: GenerateQueue      = "<<std::setw(15)<<Tmr_Step4_GenerateStack.elapsed()      <<" microseconds"<<std::endl;                    
+    std::cout<<"t Step5: FlowAcc            = "<<std::setw(15)<<Tmr_Step5_FlowAcc.elapsed()            <<" microseconds"<<std::endl;              
+    std::cout<<"t Step6: Uplift             = "<<std::setw(15)<<Tmr_Step6_Uplift.elapsed()             <<" microseconds"<<std::endl;             
+    std::cout<<"t Step7: Erosion            = "<<std::setw(15)<<Tmr_Step7_Erosion.elapsed()            <<" microseconds"<<std::endl;              
+    std::cout<<"t Overall                   = "<<std::setw(15)<<Tmr_Overall.elapsed()                  <<" microseconds"<<std::endl;        
+  }
 
       // std::cerr<<"Levels: ";
       // for(auto &l: levels)
       //   std::cerr<<l<<" ";
       // std::cerr<<std::endl;
 
-      Erode();
-
-      if( istep%20==0 )
-        std::cout<<istep<<std::endl;
-        //print*,minval(h),sum(h)/SIZE,maxval(h)
-    }
+  double* getH() const {
+    return h;
   }
 };
 
@@ -252,20 +309,14 @@ int main(){
 
   const int width  = 501;
   const int height = 501;
-  
-  std::vector<TerrainMorpher> tms;
-  for(unsigned int i=0;i<4;i++){
-    tms.push_back(TerrainMorpher(width,height));
-    tms.back().generateRandomTerrain();
-  }
+  const int nstep  = 120;
 
-  const int nstep = 120;
+  Timer tmr;
+  FastScape_RB tm(width,height);
+  tm.run(nstep);
+  std::cout<<"Calculation time = "<<tmr.elapsed()<<std::endl;
 
-  #pragma omp parallel for
-  for(unsigned int i=0;i<tms.size();i++)
-    tms.at(i).run(nstep);
-
-  PrintDEM("out.dem", tms.at(0).h, width, height);
+  PrintDEM("out_RB.dem", tm.getH(), width, height);
 
   return 0;
 }
