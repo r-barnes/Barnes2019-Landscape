@@ -96,6 +96,8 @@ class FastScape_RBP {
       h[c]  = rand()/(double)RAND_MAX;
       if(x == 0 || y==0 || x==width-1 || y==height-1)
         h[c] = 0;
+      if(x == 1 || y==1 || x==width-2 || y==height-2)
+        h[c] = 0;
     }
   }  
 
@@ -127,8 +129,8 @@ class FastScape_RBP {
   void ComputeReceivers(){
     //! computing receiver array
     #pragma omp parallel for collapse(2)
-    for(int y=1;y<height-1;y++)
-    for(int x=1;x<width-1;x++){
+    for(int y=2;y<height-2;y++)
+    for(int x=2;x<width-2;x++){
       const int c      = y*width+x;
 
       //The slope must be greater than zero for there to be downhill flow;
@@ -227,39 +229,39 @@ class FastScape_RBP {
     // std::cerr<<"nstack final = "<<nstack<<std::endl;
   }
 
+
   void ComputeFlowAcc(){
     //! computing drainage area
     for(int i=0;i<size;i++)
       accum[i] = cell_area;
 
-    // #pragma omp parallel default(none)
-    // for(int li=nlevel-2;li>=0;li--){
-    //   #pragma omp for
-    //   for(int si=levels[li];si<levels[li+1];si++){
-    //     const int c = stack[si];
+    for(int li=nlevel-2;li>=0;li--){
+      #pragma omp parallel for default(none) shared(li)
+      for(int si=levels[li];si<levels[li+1];si++){
+        const int c = stack[si];
 
-    //     if(rec[c]!=NO_FLOW){
-    //       const int n = c+nshift[rec[c]];
-    //       accum[n]   += accum[c];
-    //     }
-    //   }
-    // }    
-
-    for(int s=size-1;s>=0;s--){
-      const int c = stack[s];
-      if(rec[c]!=NO_FLOW){
-        const int n = c+nshift[rec[c]];
-        accum[n]   += accum[c];
+        if(rec[c]!=NO_FLOW){
+          const int n = c+nshift[rec[c]];
+          accum[n]   += accum[c];
+        }
       }
     }    
+
+    // for(int s=nstack-1;s>=0;s--){
+    //   const int c = stack[s];
+    //   if(rec[c]!=NO_FLOW){
+    //     const int n = c+nshift[rec[c]];
+    //     accum[n]   += accum[c];
+    //   }
+    // }    
   }
 
 
   void AddUplift(){
     //! adding uplift to landscape
     #pragma omp parallel for collapse(2)
-    for(int y=1;y<height-1;y++)
-    for(int x=1;x<width-1;x++){
+    for(int y=2;y<height-2;y++)
+    for(int x=2;x<width-2;x++){
       const int c = y*width+x;
       h[c] += ueq*dt;
     }
