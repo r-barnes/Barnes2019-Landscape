@@ -133,8 +133,8 @@ class FastScape_BW {
     for(int y=1;y<height-1;y++)
     for(int x=1;x<width-1;x++){
       const int c      = y*width+x;
-      double max_slope = -DINFTY;
-      int    max_n     = 0;
+      double max_slope = -DINFTY; //TODO: Wrong, in the case of flats
+      int    max_n     = NO_FLOW;
       for(int n=0;n<8;n++){
         double slope = (h[c] - h[c+nshift[n]])/dr[n];
         if(slope>max_slope){
@@ -142,10 +142,7 @@ class FastScape_BW {
           max_n     = n;
         }
       }
-      if(max_slope>-DINFTY)
-        rec[c] = max_n;
-      else
-        rec[c] = c;
+      rec[c] = max_n;
     }   
   }
 
