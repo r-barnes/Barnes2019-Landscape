@@ -63,13 +63,13 @@ class FastScape_BW {
   int height;
   int size;
 
-  double *h;
-  double *accum;
-  int    *rec;
-  int    *ndon;
-  int    *stack;
-  int    *donor;
-  int    nshift[8];
+  double *h;        //Digital elevation model (height)
+  double *accum;    //Flow accumulation at each point
+  int    *rec;      //Index of receiving cell
+  int    *donor;    //Indices of a cell's donor cells
+  int    *ndon;     //How many donors a cell has
+  int    *stack;    //Indices of cells in the order they should be processed
+  int    nshift[8]; //Offset from a focal cell's index to its neighbours
 
   CumulativeTimer Tmr_Step1_Initialize;
   CumulativeTimer Tmr_Step2_DetermineReceivers;
@@ -146,7 +146,7 @@ class FastScape_BW {
     for(int c=0;c<size;c++){
       if(rec[c]==NO_FLOW)
         continue;
-      const int n        = c+nshift[rec[c]];
+      const auto n       = c+nshift[rec[c]];
       donor[8*n+ndon[n]] = c;
       ndon[n]++;
     }
@@ -155,7 +155,7 @@ class FastScape_BW {
 
   void FindStack(const int c, int &nstack){
     for(int k=0;k<ndon[c];k++){
-      int n           = donor[8*c+k];
+      const auto n    = donor[8*c+k];
       stack[nstack++] = n;
       FindStack(n,nstack);
     }
@@ -294,7 +294,7 @@ int main(){
   tm.run(nstep);
   std::cout<<"Calculation time = "<<tmr.elapsed()<<std::endl;
 
-  PrintDEM("out_BW_class.dem", tm.getH(), width, height);
+  PrintDEM("out_BW.dem", tm.getH(), width, height);
 
   return 0;
 }

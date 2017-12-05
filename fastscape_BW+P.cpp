@@ -36,7 +36,7 @@ void PrintDEM(
 
 
 
-class FastScape_BW {
+class FastScape_BWP {
  private:
   static constexpr double DINFTY  = std::numeric_limits<double>::infinity();
 
@@ -63,13 +63,13 @@ class FastScape_BW {
   int height;
   int size;
 
-  double *h;
-  double *accum;
-  int    *rec;
-  int    *ndon;
-  int    *stack;
-  int    *donor;
-  int    nshift[8];
+  double *h;        //Digital elevation model (height)
+  double *accum;    //Flow accumulation at each point
+  int    *rec;      //Index of receiving cell
+  int    *donor;    //Indices of a cell's donor cells
+  int    *ndon;     //How many donors a cell has
+  int    *stack;    //Indices of cells in the order they should be processed
+  int    nshift[8]; //Offset from a focal cell's index to its neighbours
 
   std::vector<int>    stack_start;
 
@@ -97,7 +97,7 @@ class FastScape_BW {
 
 
  public:
-  FastScape_BW(const int width0, const int height0)
+  FastScape_BWP(const int width0, const int height0)
     : nshift{-1,-width0-1,-width0,-width0+1,1,width0+1,width0,width0-1}
   {
     Tmr_Overall.start();
@@ -122,7 +122,7 @@ class FastScape_BW {
     Tmr_Overall.stop();
   }
 
-  ~FastScape_BW(){
+  ~FastScape_BWP(){
     delete[] h;
   }
 
@@ -156,7 +156,7 @@ class FastScape_BW {
     for(int c=0;c<size;c++){
       if(rec[c]==NO_FLOW)
         continue;
-      const int n        = c+nshift[rec[c]];
+      const auto n       = c+nshift[rec[c]];
       donor[8*n+ndon[n]] = c;
       ndon[n]++;
     }
@@ -165,7 +165,7 @@ class FastScape_BW {
 
   void FindStack(const int c, int &nstack){
     for(int k=0;k<ndon[c];k++){
-      int n           = donor[8*c+k];
+      const auto n    = donor[8*c+k];
       stack[nstack++] = n;
       FindStack(n,nstack);
     }
@@ -315,11 +315,11 @@ int main(){
   const int nstep  = 120;
 
   Timer tmr;
-  FastScape_BW tm(width,height);
+  FastScape_BWP tm(width,height);
   tm.run(nstep);
   std::cout<<"Calculation time = "<<tmr.elapsed()<<std::endl;
 
-  PrintDEM("out_BW_class.dem", tm.getH(), width, height);
+  PrintDEM("out_BW+P.dem", tm.getH(), width, height);
 
   return 0;
 }
