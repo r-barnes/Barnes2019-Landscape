@@ -217,7 +217,7 @@ class FastScape_BW {
   }
 
 
-  void StackErode(){
+  void Erode(){
     #pragma omp parallel for schedule(dynamic)
     for(int ss=0;ss<stack_start.size()-1;ss++){
       //Execute the inner for loop as a task
@@ -229,12 +229,13 @@ class FastScape_BW {
           continue;
         const int n = c+nshift[rec[c]];   //Cell receiving the flow
 
-        const double fact = keq*dt*std::pow(accum[c],meq)/std::pow(dr[rec[c]],neq);
-        const double hn   = h[n];
-        const double h0   = h[c];
-        double hnew       = h0;
-        double hp         = h0;
-        double diff       = 2*tol;
+        const double length = dr[rec[c]];
+        const double fact   = keq*dt*std::pow(accum[c],meq)/std::pow(length,neq);
+        const double h0     = h[c];      //Elevation of focal cell
+        const double hn     = h[n];      //Elevation of neighbouring (receiving, lower) cell
+        double hnew         = h0;        //Current updated value of focal cell
+        double hp           = h0;        //Previous updated value of focal cell
+        double diff         = 2*tol;     //Difference between current and previous updated values
         while(std::abs(diff)>tol){
           hnew -= (hnew-h0+fact*std::pow(hnew-hn,neq))/(1.+fact*neq*std::pow(hnew-hn,neq-1));
           diff  = hnew - hp;
@@ -270,7 +271,7 @@ class FastScape_BW {
       Tmr_Step4_GenerateStack.start      ();   GenerateStack     (); Tmr_Step4_GenerateStack.stop      ();
       Tmr_Step5_FlowAcc.start            ();   ComputeDraingeArea(); Tmr_Step5_FlowAcc.stop            ();
       Tmr_Step6_Uplift.start             ();   AddUplift         (); Tmr_Step6_Uplift.stop             ();
-      Tmr_Step7_Erosion.start            ();   StackErode        (); Tmr_Step7_Erosion.stop            ();
+      Tmr_Step7_Erosion.start            ();   Erode             (); Tmr_Step7_Erosion.stop            ();
 
       if( step%20==0 )
         std::cout<<step<<std::endl;
@@ -299,6 +300,10 @@ class FastScape_BW {
     return h;
   }
 };
+
+
+
+
 
 
 

@@ -132,7 +132,7 @@ class FastScape_BW {
           max_n     = n;
         }
       }
-        rec[c] = max_n;
+      rec[c] = max_n;
     }   
   }
 
