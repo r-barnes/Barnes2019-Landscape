@@ -210,46 +210,25 @@ class FastScape_RBP {
     for(int i=0;i<size;i++)
       ndon[i] = 0;
 
-    //! computing donor arrays
-    // for(int c=0;c<size;c++){
-    //   if(rec[c]==NO_FLOW)
-    //     continue;
-    //   const auto n       = c+nshift[rec[c]];
-    //   donor[8*n+ndon[n]] = c;
-    //   ndon[n]++;
-    // }
+    //The B&W method of developing the donor array has each focal cell F inform
+    //its receiving cell R that F is a donor of R. Unfortunately, parallelizing
+    //this is difficult because more than one cell might be informing R at any
+    //given time. Atomics are a solution, but they impose a performance cost
+    //(though using the latest and greatest hardware decreases this penalty).
 
+    //Instead, we invert the operation. Each focal cell now examines its
+    //neighbours to see if it receives from them. Each focal cell is then
+    //guaranteed to have sole write-access to its location in the donor array.
 
-    auto do_edge = [&](const int c){
-      if(rec[c]==NO_FLOW)
-        return;
-      const auto n       = c+nshift[rec[c]];
-      donor[8*n+ndon[n]] = c;
-      ndon[n]++;
-    };
-
-    #pragma omp parallel for
-    for(int y=1;y<height-1;y++){
-      do_edge(y*width+0);
-      do_edge(y*width+width-1);
-    }
-
-    #pragma omp parallel for
-    for(int x=1;x<width-1;x++){
-      do_edge(         0*width+x);
-      do_edge((height-1)*width+x);
-    }    
-
-    //! computing donor arrays
     #pragma omp parallel for collapse(2)
     for(int y=1;y<height-1;y++)
     for(int x=1;x<width-1;x++){
       const int c = y*width+x;
       for(int ni=0;ni<8;ni++){
         const int n = c+nshift[ni];
-        if(rec[n]==c){
-          donor[8*c+ndon[n]] = c;
-          ndon[n]++;
+        if(rec[n]!=NO_FLOW && n+nshift[rec[n]]==c){
+          donor[8*c+ndon[c]] = n;
+          ndon[c]++;
         }
       }
     }
