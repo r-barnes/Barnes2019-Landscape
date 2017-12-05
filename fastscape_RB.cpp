@@ -227,6 +227,7 @@ class FastScape_RB {
     levels[0] = 0;
     nlevel    = 1;
 
+    //TODO: Outside edge is always NO_FLOW. Maybe this can get loaded once?
     //Load cells without dependencies into the queue
     for(int c=0;c<size;c++){
       if(rec[c]==NO_FLOW)
