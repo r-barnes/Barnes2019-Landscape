@@ -6,6 +6,8 @@
 #include <limits>
 #include <vector>
 #include <array>
+#include <omp.h>
+#include "Timer.hpp"
 
 const double keq = 2e-6;
 const double neq = 2;
@@ -226,7 +228,7 @@ class TerrainMorpher {
 
   void run(const int nstep){
     //! begining of time stepping
-    for(int istep=0;istep<nstep;istep++){
+    for(int istep=0;istep<=nstep;istep++){
 
       ComputeReceivers();
 
@@ -264,16 +266,29 @@ class TerrainMorpher {
 int main(){
   //feenableexcept(FE_ALL_EXCEPT);
 
-  const int width = 501;
+  const int width  = 501;
   const int height = 501;
+  const int nstep  = 800;
   
-  auto tm = TerrainMorpher(width,height);
-  tm.generateRandomTerrain();
+  #ifdef _OPENMP
+    const int threads = omp_get_max_threads();
+  #else
+    const int threads = 1;
+  #endif
 
-  const int nstep = 120;
-  tm.run(nstep);
+  std::vector<TerrainMorpher> tms;
+  for(int i=0;i<threads;i++){
+    tms.emplace_back(width,height);
+    tms.back().generateRandomTerrain();
+  }
 
-  PrintDEM("out.dem", tm.h, width, height);
+  Timer tmr;
+  #pragma omp parallel for
+  for(int i=0;i<threads;i++)
+    tms.at(i).run(nstep);
+  std::cout<<"Calculation time = "<<tmr.elapsed()<<std::endl;
+
+  PrintDEM("out.dem", tms.at(0).h, width, height);
 
   return 0;
 }
