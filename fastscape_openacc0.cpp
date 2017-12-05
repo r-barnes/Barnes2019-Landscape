@@ -272,12 +272,15 @@ int main(){
 
   const int width  = 501;
   const int height = 501;
+  const int nstep  = 120;
   
   TerrainMorpher tm(width,height);
   tm.generateRandomTerrain();
 
-  const int nstep = 120;
+
+  Timer tmr;
   tm.run(nstep);
+  std::cout<<"Calculation time = "<<tmr.elapsed()<<std::endl;
 
   PrintDEM("out.dem", tm.h, width, height);
 
