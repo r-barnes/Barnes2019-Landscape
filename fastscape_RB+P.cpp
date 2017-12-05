@@ -362,8 +362,8 @@ class FastScape_RBP {
 int main(){
   //feenableexcept(FE_ALL_EXCEPT);
 
-  const int width  = 5001;
-  const int height = 5001;
+  const int width  = 501;
+  const int height = 501;
   const int nstep  = 120;
 
   Timer tmr;
