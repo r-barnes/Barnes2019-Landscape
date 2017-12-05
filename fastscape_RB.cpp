@@ -162,7 +162,7 @@ class FastScape_RB {
       for(int x=0;x<width;x++){
         const int c = y*width+x;
         for(int ni=0;ni<8;ni++)
-          std::cerr<<std::setw(3)<<donor[c+ni];
+          std::cerr<<std::setw(3)<<donor[8*c+ni];
         std::cerr<<"|";
       }
       std::cerr<<"\n";
