@@ -21,14 +21,14 @@ void PrintDEM(
   const int height
 ){
   std::ofstream fout(filename.c_str());
-  fout<<"ncols "<<width<<"\n";
-  fout<<"nrows "<<height<<"\n";
+  fout<<"ncols "<<(width- 2)<<"\n";
+  fout<<"nrows "<<(height-2)<<"\n";
   fout<<"xllcorner 637500.000\n"; //Arbitrarily chosen value
   fout<<"yllcorner 206000.000\n"; //Arbitrarily chosen value
   fout<<"cellsize 500.000\n";     //Arbitrarily chosen value
   fout<<"NODATA_value -9999\n";
-  for(int y=0;y<height;y++){
-    for(int x=0;x<width;x++)
+  for(int y=1;y<height-1;y++){
+    for(int x=1;x<width-1;x++)
       fout<<h[y*width+x]<<" ";
     fout<<"\n";
   }
@@ -59,9 +59,9 @@ class FastScape_BWP {
 
 
  private:
-  int width;
-  int height;
-  int size;
+  int width;        //Width of DEM
+  int height;       //Height of DEM
+  int size;         //Size of DEM (width*height)
 
   double *h;        //Digital elevation model (height)
   double *accum;    //Flow accumulation at each point
@@ -126,15 +126,73 @@ class FastScape_BWP {
     delete[] h;
   }
 
+  void printDiagnostic(){
+    return;
+    std::cerr<<"idx: "<<std::endl;
+    for(int y=0;y<height;y++){
+      for(int x=0;x<width;x++){
+        std::cerr<<std::setw(6)<<std::setprecision(3)<<h[y*width+x];
+        std::cerr<<"| ";
+      }
+      std::cerr<<"\n";
+    }
+
+    std::cerr<<"idx: "<<std::endl;
+    for(int y=0;y<height;y++){
+      for(int x=0;x<width;x++){
+        std::cerr<<std::setw(6)<<(y*width+x);
+        std::cerr<<"| ";
+      }
+      std::cerr<<"\n";
+    }
+
+    std::cerr<<"Rec: "<<std::endl;
+    std::cerr<<"NO_FLOW = "<<NO_FLOW<<std::endl;
+    for(int y=0;y<height;y++){
+      for(int x=0;x<width;x++){
+        std::cerr<<std::setw(6)<<rec[y*width+x];
+        std::cerr<<"| ";
+      }
+      std::cerr<<"\n";
+    }    
+
+    std::cerr<<"Donor: "<<std::endl;
+    for(int x=0;x<width;x++)
+      std::cerr<<std::setw(24)<<x<<"|";
+    std::cerr<<std::endl;
+    for(int y=0;y<height;y++){
+      for(int x=0;x<width;x++){
+        const int c = y*width+x;
+        for(int ni=0;ni<8;ni++)
+          std::cerr<<std::setw(3)<<donor[c+ni];
+        std::cerr<<"|";
+      }
+      std::cerr<<"\n";
+    }    
+
+    std::cerr<<"ndon: "<<std::endl;
+    for(int y=0;y<height;y++){
+      for(int x=0;x<width;x++){
+        std::cerr<<std::setw(6)<<ndon[y*width+x];
+        std::cerr<<"| ";
+      }
+      std::cerr<<"\n";
+    }        
+  }
 
  private:
   void ComputeReceivers(){
     //! computing receiver array
+    #pragma omp parallel for collapse(2)
     for(int y=1;y<height-1;y++)
     for(int x=1;x<width-1;x++){
       const int c      = y*width+x;
-      double max_slope = -DINFTY; //TODO: Wrong, in the case of flats
+
+      //The slope must be greater than zero for there to be downhill flow;
+      //otherwise, the cell is marekd NO_FLOW
+      double max_slope = 0;
       int    max_n     = NO_FLOW;
+
       for(int n=0;n<8;n++){
         double slope = (h[c] - h[c+nshift[n]])/dr[n];
         if(slope>max_slope){
@@ -192,7 +250,7 @@ class FastScape_BWP {
   }
 
 
-  void ComputeDraingeArea(){
+  void ComputeFlowAcc(){
     //! computing drainage area
     for(int i=0;i<size;i++)
       accum[i] = cell_area;
@@ -209,6 +267,7 @@ class FastScape_BWP {
 
   void AddUplift(){
     //! adding uplift to landscape
+    #pragma omp parallel for collapse(2)
     for(int y=1;y<height-1;y++)
     for(int x=1;x<width-1;x++){
       const int c = y*width+x;
@@ -220,7 +279,6 @@ class FastScape_BWP {
   void Erode(){
     #pragma omp parallel for schedule(dynamic)
     for(int ss=0;ss<stack_start.size()-1;ss++){
-      //Execute the inner for loop as a task
       const int sstart = stack_start.at(ss);
       const int send   = stack_start.at(ss+1);
       for(int s=sstart;s<send;s++){
@@ -269,7 +327,7 @@ class FastScape_BWP {
       Tmr_Step2_DetermineReceivers.start ();   ComputeReceivers  (); Tmr_Step2_DetermineReceivers.stop ();
       Tmr_Step3_DetermineDonors.start    ();   ComputeDonors     (); Tmr_Step3_DetermineDonors.stop    ();
       Tmr_Step4_GenerateStack.start      ();   GenerateStack     (); Tmr_Step4_GenerateStack.stop      ();
-      Tmr_Step5_FlowAcc.start            ();   ComputeDraingeArea(); Tmr_Step5_FlowAcc.stop            ();
+      Tmr_Step5_FlowAcc.start            ();   ComputeFlowAcc    (); Tmr_Step5_FlowAcc.stop            ();
       Tmr_Step6_Uplift.start             ();   AddUplift         (); Tmr_Step6_Uplift.stop             ();
       Tmr_Step7_Erosion.start            ();   Erode             (); Tmr_Step7_Erosion.stop            ();
 
