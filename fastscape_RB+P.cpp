@@ -336,6 +336,7 @@ class FastScape_RBP {
     delete[] ndon;
     delete[] stack;
     delete[] donor;
+    delete[] levels;
 
     Tmr_Overall.stop();
 
