@@ -71,6 +71,11 @@ class FastScape_BW {
   int    *stack;    //Indices of cells in the order they should be processed
   int    nshift[8]; //Offset from a focal cell's index to its neighbours
 
+  //nshift offsets:
+  //1 2 3
+  //0   4
+  //7 6 5
+
   CumulativeTimer Tmr_Step1_Initialize;
   CumulativeTimer Tmr_Step2_DetermineReceivers;
   CumulativeTimer Tmr_Step3_DetermineDonors;
@@ -116,8 +121,10 @@ class FastScape_BW {
     delete[] h;
   }
 
-  void printDiagnostic(){
+  void printDiagnostic(std::string msg){
     return;
+    std::cerr<<"\n#################\n"<<msg<<std::endl;
+
     std::cerr<<"idx: "<<std::endl;
     for(int y=0;y<height;y++){
       for(int x=0;x<width;x++){
@@ -154,7 +161,7 @@ class FastScape_BW {
       for(int x=0;x<width;x++){
         const int c = y*width+x;
         for(int ni=0;ni<8;ni++)
-          std::cerr<<std::setw(3)<<donor[c+ni];
+          std::cerr<<std::setw(3)<<donor[8*c+ni];
         std::cerr<<"|";
       }
       std::cerr<<"\n";
