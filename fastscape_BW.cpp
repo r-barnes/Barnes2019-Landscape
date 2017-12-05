@@ -95,6 +95,8 @@ class FastScape_BW {
       h[c]  = rand()/(double)RAND_MAX;
       if(x == 0 || y==0 || x==width-1 || y==height-1)
         h[c] = 0;
+      if(x == 1 || y==1 || x==width-2 || y==height-2)
+        h[c] = 0;
     }
   }  
 
@@ -180,8 +182,8 @@ class FastScape_BW {
  private:
   void ComputeReceivers(){
     //! computing receiver array
-    for(int y=1;y<height-1;y++)
-    for(int x=1;x<width-1;x++){
+    for(int y=2;y<height-2;y++)
+    for(int x=2;x<width-2;x++){
       const int c      = y*width+x;
 
       //The slope must be greater than zero for there to be downhill flow;
@@ -254,8 +256,8 @@ class FastScape_BW {
 
   void AddUplift(){
     //! adding uplift to landscape
-    for(int y=1;y<height-1;y++)
-    for(int x=1;x<width-1;x++){
+    for(int y=2;y<height-2;y++)
+    for(int x=2;x<width-2;x++){
       const int c = y*width+x;
       h[c] += ueq*dt;
     }    
