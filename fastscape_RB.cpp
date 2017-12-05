@@ -56,9 +56,9 @@ class FastScape_RB {
 
 
  private:
-  int width;
-  int height;
-  int size;
+  int width;        //Width of DEM
+  int height;       //Height of DEM
+  int size;         //Size of DEM (width*height)
 
   double *h;        //Digital elevation model (height)
   double *accum;    //Flow accumulation at each point
@@ -70,6 +70,7 @@ class FastScape_RB {
 
   int    *levels;   //Indices of locations in stack where a level begins and ends
   int    nlevel;    //Number of levels used
+  int    nstack;    //Number of levels used in the stack
   
   CumulativeTimer Tmr_Step1_Initialize;
   CumulativeTimer Tmr_Step2_DetermineReceivers;
@@ -89,7 +90,7 @@ class FastScape_RB {
       const int c = y*width+x;
       h[c]  = rand()/(double)RAND_MAX;
       if(x == 0 || y==0 || x==width-1 || y==height-1)
-        h[c] = 0;
+        h[c] = 0; //TODO
     }
   }  
 
