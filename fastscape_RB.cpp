@@ -90,7 +90,7 @@ class FastScape_RB {
       const int c = y*width+x;
       h[c]  = rand()/(double)RAND_MAX;
       if(x == 0 || y==0 || x==width-1 || y==height-1)
-        h[c] = 0; //TODO
+        h[c] = 0;
     }
   }  
 
@@ -177,8 +177,12 @@ class FastScape_RB {
     for(int y=1;y<height-1;y++)
     for(int x=1;x<width-1;x++){
       const int c      = y*width+x;
-      double max_slope = -DINFTY; //TODO: Wrong, in the case of flats
+
+      //The slope must be greater than zero for there to be downhill flow;
+      //otherwise, the cell is marekd NO_FLOW
+      double max_slope = 0;
       int    max_n     = NO_FLOW;
+
       for(int n=0;n<8;n++){
         double slope = (h[c] - h[c+nshift[n]])/dr[n];
         if(slope>max_slope){
@@ -235,6 +239,7 @@ class FastScape_RB {
     }
     // std::cerr<<"nstack final = "<<nstack<<std::endl;
   }
+
 
   void ComputeFlowAcc(){
     //! computing drainage area
