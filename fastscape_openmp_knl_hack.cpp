@@ -76,14 +76,17 @@ void ErodePoint(
     const int    n      = c+nshift[rec[n]];
     const double length = dr[rec[n]];
     const double fact   = keq*dt*std::pow(accum[c],meq)/std::pow(length,neq);
-    //Use Newton's method to solve backward Euler equation. Fix number of loops
-    //to 5, which should be sufficient
+    //Use Newton's method to solve backward Euler equation.
     const double hn = h[n];
     const double h0 = h[c];
     double hnew     = h0;
-    for(int i=0;i<5;i++)
+    double hp       = h0;
+    double diff     = 2*tol;
+    while(std::abs(diff)>tol){
       hnew -= (hnew-h0+fact*std::pow(hnew-hn,neq))/(1.+fact*neq*std::pow(hnew-hn,neq-1));
-
+      diff  = hnew - hp;
+      hp    = hnew;
+    }
     h[c] = hnew;
   }
 
@@ -204,15 +207,11 @@ int main(){
 
     //Initialize stack with cells which do not have dependencies
     #pragma omp parallel
-    {
-      #pragma omp single nowait
-      {
-        for(int c=0;c<SIZE;c++){
-          if(rec[c]==NO_FLOW){
-            #pragma omp task shared(h)
-            ErodePoint(c,donor,ndon,rec,accum,nshift,h);
-          }
-        }
+    #pragma omp single nowait
+    for(int c=0;c<SIZE;c++){
+      if(rec[c]==NO_FLOW){
+        #pragma omp task default(none) shared(donor,ndon,rec,accum,h) firstprivate(c)
+        ErodePoint(c,donor,ndon,rec,accum,nshift,h);
       }
     }
 
@@ -224,7 +223,7 @@ int main(){
 
   }
 
-  PrintDEM("out.dem", h, WIDTH, HEIGHT);
+  PrintDEM("out_knl.dem", h, WIDTH, HEIGHT);
 
   return 0;
 }
