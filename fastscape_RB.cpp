@@ -207,8 +207,9 @@ class FastScape_RB {
   }
 
   void GenerateQueue(){
-    int nstack = 0;
     int qpoint = 0;
+
+    nstack = 0;
 
     levels[0] = 0;
     nlevel    = 1;
@@ -240,7 +241,7 @@ class FastScape_RB {
     for(int i=0;i<size;i++)
       accum[i] = cell_area;
 
-    for(int s=size-1;s>=0;s--){
+    for(int s=nstack-1;s>=0;s--){
       const int c = stack[s];
       if(rec[c]!=NO_FLOW){
         const int n = c+nshift[rec[c]];
