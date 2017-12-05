@@ -236,7 +236,7 @@ class FastScape_RB {
     // std::cerr<<"nstack final = "<<nstack<<std::endl;
   }
 
-  void ComputeDraingeArea(){
+  void ComputeFlowAcc(){
     //! computing drainage area
     for(int i=0;i<size;i++)
       accum[i] = cell_area;
@@ -317,7 +317,7 @@ class FastScape_RB {
       Tmr_Step2_DetermineReceivers.start ();   ComputeReceivers  (); Tmr_Step2_DetermineReceivers.stop ();
       Tmr_Step3_DetermineDonors.start    ();   ComputeDonors     (); Tmr_Step3_DetermineDonors.stop    ();
       Tmr_Step4_GenerateStack.start      ();   GenerateQueue     (); Tmr_Step4_GenerateStack.stop      ();
-      Tmr_Step5_FlowAcc.start            ();   ComputeDraingeArea(); Tmr_Step5_FlowAcc.stop            ();
+      Tmr_Step5_FlowAcc.start            ();   ComputeFlowAcc    (); Tmr_Step5_FlowAcc.stop            ();
       Tmr_Step6_Uplift.start             ();   AddUplift         (); Tmr_Step6_Uplift.stop             ();
       Tmr_Step7_Erosion.start            ();   Erode             (); Tmr_Step7_Erosion.stop            ();
 
