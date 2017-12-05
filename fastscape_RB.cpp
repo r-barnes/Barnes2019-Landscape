@@ -122,8 +122,10 @@ class FastScape_RB {
     delete[] h;
   }
 
-  void printDiagnostic(){
+  void printDiagnostic(std::string msg){
     return;
+    std::cerr<<"\n#################\n"<<msg<<std::endl;
+
     std::cerr<<"idx: "<<std::endl;
     for(int y=0;y<height;y++){
       for(int x=0;x<width;x++){
