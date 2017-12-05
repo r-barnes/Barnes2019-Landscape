@@ -10,3 +10,4 @@ perf.data*
 scorep*
 refs/
 paper/
+*.log
