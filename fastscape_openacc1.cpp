@@ -6,6 +6,7 @@
 #include <limits>
 #include <vector>
 #include <array>
+#include "Timer.hpp"
 
 const double keq     = 2e-6;
 const double neq     = 2;
@@ -74,7 +75,7 @@ void ComputeReceivers(
   for(int y=1;y<height-1;y++)
   for(int x=1;x<width-1;x++){
     const int c      = y*width+x;
-    double max_slope = -DINFTY;
+    double max_slope = -DINFTY; //TODO: Wrong, in the case of flats
     int    max_n     = NO_FLOW;
     for(int n=0;n<8;n++){
       double slope = (h[c] - h[c+nshift[n]])/dr[n];
@@ -145,6 +146,7 @@ void GenerateStack(
       stack[nstack++] = n;
     }
 
+    //TODO: What's this about, then?
     qpoint++;
     if(qpoint==levels.back() && nstack!=levels.back())
       levels.push_back(nstack); //Starting a new level      
@@ -190,6 +192,8 @@ void AddUplift(
   const int height,
   double *const h
 ){
+  const int size = width*height;
+
   //! adding uplift to landscape
   for(int y=1;y<height-1;y++)
   for(int x=1;x<width-1;x++){
@@ -214,7 +218,7 @@ void Erode(
 
   const double tol = 1.e-3;
 
-  #pragma acc data default(none) copy(hvec[0:h.size()]) copyin(accvec[0:accum.size()], recvec[0:rec.size()], stackvec[0:stack.size()]) present(dr, nshift)
+  #pragma acc data default(none) copy(h[0:size]) copyin(accum[0:size], rec[0:size], stack[0:size]) present(dr, nshift)
   for(unsigned int li=0;li<levels.size()-1;li++){
     const auto lvlstart = levels[li];
     const auto lvlend   = levels[li+1];
@@ -223,17 +227,15 @@ void Erode(
       const int c = stack[si]; //Cell from which flow originates
       if(rec[c]!=NO_FLOW){  //Can't use continue inside of OpenAcc
         const int n         = c+nshift[rec[c]];   //Cell receiving the flow
+
         const double length = dr[rec[c]];
         const double fact   = keq*dt*std::pow(accum[c],meq)/std::pow(length,neq);
-        const double h0     = h[c];
-        const double hn     = h[n];
-        double hp           = h0;
-        double diff         = 2*tol;
-        double hnew         = h0;
+        const double h0     = h[c];      //Elevation of focal cell
+        const double hn     = h[n];      //Elevation of neighbouring (receiving, lower) cell
+        double hnew         = h0;        //Current updated value of focal cell
+        double hp           = h0;        //Previous updated value of focal cell
+        double diff         = 2*tol;     //Difference between current and previous updated values
         while(std::abs(diff)>tol){
-          //Use Newton's method to solve backward Euler equation. Fix number of loops
-          //to 5, which should be sufficient
-          //for(int i=0;i<5;i++)
           hnew -= (hnew-h0+fact*std::pow(hnew-hn,neq))/(1.+fact*neq*std::pow(hnew-hn,neq-1));
           diff  = hnew - hp;
           hp    = hnew;
@@ -267,17 +269,17 @@ double* TerrainMorpher(
 
   #pragma acc enter data copyin(dr[0:8], nshift[0:8])
 
-  for(int step=0;step<nstep;step++){
+  for(int step=0;step<=nstep;step++){
 
     ComputeReceivers(h, nshift, width, height, rec);
+
+    AddUplift(width, height, h);
 
     ComputeDonors(rec, nshift, width, height, donor, ndon);
 
     GenerateStack(rec, donor, ndon, width, height, levels, stack);
 
     ComputeDraingeArea(rec, nshift, stack, width, height, accum);
-
-    AddUplift(width, height, h);
 
     Erode(accum, rec, stack, nshift, levels, width, height, h);
 
@@ -302,11 +304,13 @@ double* TerrainMorpher(
 int main(){
   //feenableexcept(FE_ALL_EXCEPT);
 
-  const int width  = 501;
-  const int height = 501;
+  const int width  = 1001;
+  const int height = 1001;
   const int nstep  = 120;
 
+  Timer tmr;
   auto h = TerrainMorpher(width,height,nstep);
+  std::cout<<"Calculation time = "<<tmr.elapsed()<<std::endl;
 
   PrintDEM("out.dem", h, width, height);
 
