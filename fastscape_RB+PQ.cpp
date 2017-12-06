@@ -187,6 +187,8 @@ class FastScape_RBPQ {
  private:
   void ComputeReceivers(){
     //! computing receiver array
+    #pragma omp barrier
+
     #pragma omp for collapse(2) schedule(static) nowait
     for(int y=2;y<height-2;y++)
     for(int x=2;x<width-2;x++){
@@ -221,6 +223,7 @@ class FastScape_RBPQ {
     //guaranteed to have sole write-access to its location in the donor array.
 
     #pragma omp barrier
+
     #pragma omp for collapse(2) schedule(static) nowait
     for(int y=1;y<height-1;y++)
     for(int x=1;x<width-1;x++){
@@ -277,6 +280,7 @@ class FastScape_RBPQ {
       //Interior cells
       //TODO: Outside edge is always NO_FLOW. Maybe this can get loaded once?
       //Load cells without dependencies into the queue
+      //TODO: Why can't I use nowait here?
       #pragma omp for collapse(2) schedule(static) 
       for(int y=2;y<height-2;y++)
       for(int x=2;x<width -2;x++){
@@ -375,7 +379,6 @@ class FastScape_RBPQ {
 
 
   void Erode(){
-    #pragma omp barrier
     //#pragma omp parallel 
     {
       const int tnum     = omp_get_thread_num();
@@ -450,18 +453,16 @@ class FastScape_RBPQ {
 
     Tmr_Step1_Initialize.stop();
 
+    #pragma omp parallel
     for(int step=0;step<=nstep;step++){
-      std::cerr<<"t = "<<step<<std::endl;
-      #pragma omp parallel
-      {
-        Tmr_Step2_DetermineReceivers.start ();   ComputeReceivers  (); Tmr_Step2_DetermineReceivers.stop ();
-        Tmr_Step3_DetermineDonors.start    ();   ComputeDonors     (); Tmr_Step3_DetermineDonors.stop    ();
-        Tmr_Step4_GenerateStack.start      ();   GenerateQueue     (); Tmr_Step4_GenerateStack.stop      ();
-        Tmr_Step5_FlowAcc.start            ();   ComputeFlowAcc    (); Tmr_Step5_FlowAcc.stop            ();
-        Tmr_Step6_Uplift.start             ();   AddUplift         (); Tmr_Step6_Uplift.stop             ();
-        Tmr_Step7_Erosion.start            ();   Erode             (); Tmr_Step7_Erosion.stop            ();
-      }
+      Tmr_Step2_DetermineReceivers.start ();   ComputeReceivers  (); Tmr_Step2_DetermineReceivers.stop ();
+      Tmr_Step3_DetermineDonors.start    ();   ComputeDonors     (); Tmr_Step3_DetermineDonors.stop    ();
+      Tmr_Step4_GenerateStack.start      ();   GenerateQueue     (); Tmr_Step4_GenerateStack.stop      ();
+      Tmr_Step5_FlowAcc.start            ();   ComputeFlowAcc    (); Tmr_Step5_FlowAcc.stop            ();
+      Tmr_Step6_Uplift.start             ();   AddUplift         (); Tmr_Step6_Uplift.stop             ();
+      Tmr_Step7_Erosion.start            ();   Erode             (); Tmr_Step7_Erosion.stop            ();
 
+      #pragma omp master
       if( step%20==0 )
         std::cout<<step<<std::endl;
     }
