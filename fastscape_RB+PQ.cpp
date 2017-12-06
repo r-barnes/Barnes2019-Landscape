@@ -258,6 +258,7 @@ class FastScape_RBPQ {
       tlevels[0] = 0;
       tnlevel    = 1;
 
+      //Outer edge
       #pragma omp for schedule(static) nowait
       for(int y=1;y<height-1;y++){
         tstack[nstack++] = y*width+1;                assert(nstack<2*size);
@@ -270,6 +271,10 @@ class FastScape_RBPQ {
         tstack[nstack++] = (height-2)*width+x;       assert(nstack<2*size);
       }
 
+      //End of outer edge
+      tlevels[tnlevel++] = nstack; //Last cell of this level
+
+      //Interior cells
       //TODO: Outside edge is always NO_FLOW. Maybe this can get loaded once?
       //Load cells without dependencies into the queue
       #pragma omp for collapse(2) schedule(static) 
@@ -341,25 +346,31 @@ class FastScape_RBPQ {
 
 
   void AddUplift(){
-    // const int tnum     = omp_get_thread_num();
-    // const int twidth   = 2*size/omp_get_num_threads(); //TODO: Need a constant
-    // const int toffset  = tnum*twidth;
-    // const int tlwidth  = size/omp_get_num_threads();   //TODO: Need a constant
-    // const int tloffset = tnum*tlwidth;
-    // const int *const tstack  = &stack[toffset];
-    // const int *const tlevels = &levels[tloffset];
-    // const int &tnlevel = nlevel[tnum];    
+    const int tnum           = omp_get_thread_num();
+    const int twidth         = 2*size/omp_get_num_threads(); //TODO: Need a constant
+    const int toffset        = tnum*twidth;
+    const int tlwidth        = size/omp_get_num_threads();   //TODO: Need a constant
+    const int tloffset       = tnum*tlwidth;
+    const int *const tstack  = &stack[toffset];
+    const int *const tlevels = &levels[tloffset];
+    const int &tnlevel       = nlevel[tnum];
 
     // for(int i=tlevels[0];i<tlevels[tnlevel-1];i++)
     //   h[tstack[i]] += ueq*dt;
 
-    // //! adding uplift to landscape
-    #pragma omp for collapse(2) schedule(static)
-    for(int y=2;y<height-2;y++)
-    for(int x=2;x<width-2;x++){
-      const int c = y*width+x;
-      h[c] += ueq*dt;
+    //Start at tlevels[1] so we don't elevate the outer edge
+    for(int i=tlevels[1];i<tlevels[tnlevel-1];i++){
+      const int c = tstack[i];
+      h[c] += ueq*dt; 
     }
+
+    // //! adding uplift to landscape
+    // #pragma omp for collapse(2) schedule(static)
+    // for(int y=2;y<height-2;y++)
+    // for(int x=2;x<width-2;x++){
+    //   const int c = y*width+x;
+    //   h[c] += ueq*dt;
+    // }
   }
 
 
