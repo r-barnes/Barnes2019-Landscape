@@ -4,16 +4,22 @@
 CumulativeTimer::CumulativeTimer(){}
 
 void CumulativeTimer::start(){
-  running    = true;
-  start_time = clock::now();
+  #pragma omp master
+  {
+    running    = true;
+    start_time = clock::now();
+  }
 }
 
 void CumulativeTimer::stop(){
-  if(!running)
-    throw std::runtime_error("Can't stop a Timer that hasn't been started!");
+  #pragma omp master
+  {
+    if(!running)
+      throw std::runtime_error("Can't stop a Timer that hasn't been started!");
 
-  running          = false;
-  cumulative_time += std::chrono::duration_cast<std::chrono::microseconds> (clock::now() - start_time).count();
+    running          = false;
+    cumulative_time += std::chrono::duration_cast<std::chrono::microseconds> (clock::now() - start_time).count();
+  }
 }
 
 void CumulativeTimer::reset(){
