@@ -210,11 +210,6 @@ class FastScape_RBPQ {
 
 
   void ComputeDonors(){
-    //! initialising number of donors per node to 0
-    #pragma omp for schedule(static) 
-    for(int i=0;i<size;i++)
-      ndon[i] = 0;
-
     //The B&W method of developing the donor array has each focal cell F inform
     //its receiving cell R that F is a donor of R. Unfortunately, parallelizing
     //this is difficult because more than one cell might be informing R at any
@@ -225,10 +220,12 @@ class FastScape_RBPQ {
     //neighbours to see if it receives from them. Each focal cell is then
     //guaranteed to have sole write-access to its location in the donor array.
 
-    #pragma omp for collapse(2) schedule(static) 
+    #pragma omp barrier
+    #pragma omp for collapse(2) schedule(static) nowait
     for(int y=1;y<height-1;y++)
     for(int x=1;x<width-1;x++){
       const int c = y*width+x;
+      ndon[c] = 0;
       for(int ni=0;ni<8;ni++){
         const int n = c+nshift[ni];
         if(rec[n]!=NO_FLOW && n+nshift[rec[n]]==c){
@@ -251,12 +248,10 @@ class FastScape_RBPQ {
       int *const tlevels = &levels[tloffset];
       int &tnlevel       = nlevel[tnum];
 
-      #pragma omp for schedule(static)
-      for(int i=0;i<2*size;i++)
-        stack[i] = -1;
-
-      #pragma omp for schedule(static)
-      for(int i=0;i<size;i++)
+      //TODO: These loops are just a safety feature
+      for(int i=tnum*twidth;i<(tnum+1)*twidth && i<2*size;i++)
+        stack[i] = -1;;
+      for(int i=tnum*tlwidth;i<(tnum+1)*tlwidth && i<size;i++)
         levels[i] = -1;
 
       int nstack = 0; //Thread local
@@ -433,8 +428,17 @@ class FastScape_RBPQ {
     levels = new int[size]; //TODO: Make smaller to `2*width+2*height`
 
     //! initializing rec
-    for(int i=0;i<size;i++)
-      rec[i] = NO_FLOW;
+    #pragma omp parallel
+    {
+      #pragma omp for
+      for(int i=0;i<size;i++)
+        rec[i] = NO_FLOW;
+
+      #pragma omp for
+      for(int i=0;i<size;i++)
+        ndon[i] = 0;
+    }
+
 
     Tmr_Step1_Initialize.stop();
 
