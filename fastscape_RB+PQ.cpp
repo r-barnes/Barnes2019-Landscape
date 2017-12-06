@@ -187,7 +187,7 @@ class FastScape_RBPQ {
  private:
   void ComputeReceivers(){
     //! computing receiver array
-    #pragma omp for collapse(2) schedule(static) 
+    #pragma omp for collapse(2) schedule(static) nowait
     for(int y=2;y<height-2;y++)
     for(int x=2;x<width-2;x++){
       const int c      = y*width+x;
