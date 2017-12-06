@@ -258,13 +258,13 @@ class FastScape_RBPQ {
       tlevels[0] = 0;
       tnlevel    = 1;
 
-      #pragma omp for schedule(static)
+      #pragma omp for schedule(static) nowait
       for(int y=1;y<height-1;y++){
         tstack[nstack++] = y*width+1;                assert(nstack<2*size);
         tstack[nstack++] = y*width+(width-2);        assert(nstack<2*size);
       }
 
-      #pragma omp for schedule(static)
+      #pragma omp for schedule(static) nowait
       for(int x=1;x<width-1;x++){
         tstack[nstack++] =          1*width+x;       assert(nstack<2*size);
         tstack[nstack++] = (height-2)*width+x;       assert(nstack<2*size);
@@ -272,7 +272,7 @@ class FastScape_RBPQ {
 
       //TODO: Outside edge is always NO_FLOW. Maybe this can get loaded once?
       //Load cells without dependencies into the queue
-      #pragma omp for collapse(2) schedule(static)
+      #pragma omp for collapse(2) schedule(static) 
       for(int y=2;y<height-2;y++)
       for(int x=2;x<width -2;x++){
         const int c = y*width+x;
@@ -313,15 +313,12 @@ class FastScape_RBPQ {
       const int *const tlevels = &levels[tloffset];
       const int &tnlevel       = nlevel[tnum];
 
-      #pragma omp for schedule(static)
-      for(int i=0;i<size;i++)
-        accum[i] = cell_area;
-
-      // for(int i=tlevels[0];i<tlevels[tnlevel-1];i++)
-      //   accum[tstack[i]] = cell_area;
+      for(int i=tlevels[0];i<tlevels[tnlevel-1];i++){
+        const int c = tstack[i];
+        accum[c] = cell_area;
+      }
 
       for(int li=tnlevel-2;li>=0;li--){
-        #pragma omp parallel for default(none) shared(li)
         for(int si=tlevels[li];si<tlevels[li+1];si++){
           const int c = tstack[si];
 
