@@ -41,8 +41,6 @@ void PrintDEM(
 
 class FastScape_RBPQ {
  private:
-  static constexpr double DINFTY  = std::numeric_limits<double>::infinity();
-
   const int    NO_FLOW = -1;
   const double SQRT2   = 1.414213562373095048801688724209698078569671875376948;
 
