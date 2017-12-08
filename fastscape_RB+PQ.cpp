@@ -14,6 +14,7 @@
 #ifndef _OPENMP
   #define omp_get_thread_num()  0
   #define omp_get_num_threads() 1
+  #define omp_get_max_threads() 1
 #endif
 
 void PrintDEM(
@@ -73,6 +74,9 @@ class FastScape_RBPQ {
   int    *stack;    //Indices of cells in the order they should be processed
   int    nshift[8]; //Offset from a focal cell's index to its neighbours
 
+  int    t_stack_width; //Number of stack entries available to each thread
+  int    t_level_width; //Number of level entries available to each thread
+
   //nshift offsets:
   //1 2 3
   //0   4
@@ -117,6 +121,9 @@ class FastScape_RBPQ {
     size   = width*height;
 
     h      = new double[size];
+
+    t_stack_width = 2*size/omp_get_max_threads(); //TODO: Explain
+    t_level_width = size/omp_get_max_threads();   //TODO: Explain, make smaller
 
     GenerateRandomTerrain();
 
@@ -240,178 +247,138 @@ class FastScape_RBPQ {
   }
 
   void GenerateQueue(){
-    //#pragma omp parallel
-    {
-      const int tnum     = omp_get_thread_num();
-      const int twidth   = 2*size/omp_get_num_threads(); //TODO: Need a constant
-      const int toffset  = tnum*twidth;
-      const int tlwidth  = size/omp_get_num_threads();   //TODO: Need a constant
-      const int tloffset = tnum*tlwidth;
-      int *const tstack  = &stack[toffset];
-      int *const tlevels = &levels[tloffset];
-      int &tnlevel       = nlevel[tnum];
+    const int tnum = omp_get_thread_num();
+    auto tstack    = &stack[tnum*t_stack_width];
+    auto tlevels   = &levels[tnum*t_level_width];
+    int &tnlevel   = nlevel[tnum];
 
-      //TODO: These loops are just a safety feature
-      for(int i=tnum*twidth;i<(tnum+1)*twidth && i<2*size;i++)
-        stack[i] = -1;;
-      for(int i=tnum*tlwidth;i<(tnum+1)*tlwidth && i<size;i++)
-        levels[i] = -1;
+    //TODO: These loops are just a safety feature
+    for(int i=0;i<t_stack_width;i++)
+      tstack[i] = -1;;
+    for(int i=0;i<t_level_width;i++)
+      tlevels[i] = -1;
 
-      int nstack = 0; //Thread local
-      tlevels[0] = 0;
-      tnlevel    = 1;
+    int tnstack = 0; //Thread local
+    tlevels[0] = 0;
+    tnlevel    = 1;
 
-      //Outer edge
-      #pragma omp for schedule(static) nowait
-      for(int y=1;y<height-1;y++){
-        tstack[nstack++] = y*width+1;                assert(nstack<2*size);
-        tstack[nstack++] = y*width+(width-2);        assert(nstack<2*size);
-      }
+    //Outer edge
+    #pragma omp for schedule(static) nowait
+    for(int y=1;y<height-1;y++){
+      tstack[tnstack++] = y*width+1;          assert(tnstack<t_stack_width);
+      tstack[tnstack++] = y*width+(width-2);  assert(tnstack<t_stack_width);
+    }
 
-      #pragma omp for schedule(static) nowait
-      for(int x=1;x<width-1;x++){
-        tstack[nstack++] =          1*width+x;       assert(nstack<2*size);
-        tstack[nstack++] = (height-2)*width+x;       assert(nstack<2*size);
-      }
+    #pragma omp for schedule(static) nowait
+    for(int x=1;x<width-1;x++){
+      tstack[tnstack++] =          1*width+x; assert(tnstack<t_stack_width);
+      tstack[tnstack++] = (height-2)*width+x; assert(tnstack<t_stack_width);
+    }
 
-      //End of outer edge
-      tlevels[tnlevel++] = nstack; //Last cell of this level
+    //End of outer edge
+    tlevels[tnlevel++] = tnstack; //Last cell of this level
 
-      //Interior cells
-      //TODO: Outside edge is always NO_FLOW. Maybe this can get loaded once?
-      //Load cells without dependencies into the queue
-      //TODO: Why can't I use nowait here?
-      #pragma omp for collapse(2) schedule(static) 
-      for(int y=2;y<height-2;y++)
-      for(int x=2;x<width -2;x++){
-        const int c = y*width+x;
-        if(rec[c]==NO_FLOW)
-          tstack[nstack++] = c;
-      }
-      tlevels[tnlevel++] = nstack; //Last cell of this level
-
-      int qpoint = 0;
-
-      while(qpoint<nstack){
-        const auto c = tstack[qpoint];
-        for(int k=0;k<ndon[c];k++){
-          const auto n    = donor[8*c+k];
-          tstack[nstack++] = n;
-        }
-
-        //TODO: What's this about, then?
-        qpoint++;
-        if(qpoint==tlevels[tnlevel-1] && nstack!=tlevels[tnlevel-1])
-          tlevels[tnlevel++] = nstack; //Starting a new level      
+    //Interior cells
+    //TODO: Outside edge is always NO_FLOW. Maybe this can get loaded once?
+    //Load cells without dependencies into the queue
+    //TODO: Why can't I use nowait here?
+    #pragma omp for collapse(2) schedule(static) 
+    for(int y=2;y<height-2;y++)
+    for(int x=2;x<width -2;x++){
+      const int c = y*width+x;
+      if(rec[c]==NO_FLOW){
+        tstack[tnstack++] = c;                assert(tnstack<t_stack_width);
       }
     }
-    // std::cerr<<"nstack final = "<<nstack<<std::endl;
+    //Last cell of this level
+    tlevels[tnlevel++] = tnstack;             assert(tnlevel<t_level_width); 
+
+    int qpoint = 0;
+
+    while(qpoint<tnstack){
+      const auto c = tstack[qpoint];
+      for(int k=0;k<ndon[c];k++){
+        const auto n    = donor[8*c+k];
+        tstack[tnstack++] = n;                assert(tnstack<t_stack_width);
+      }
+
+      //TODO: What's this about, then?
+      qpoint++;
+      if(qpoint==tlevels[tnlevel-1] && tnstack!=tlevels[tnlevel-1]){
+        //Starting a new level      
+        tlevels[tnlevel++] = tnstack;         assert(tnlevel<t_level_width); 
+      }
+    }
+    // std::cerr<<"tnstack final = "<<tnstack<<std::endl;
   }
 
 
   void ComputeFlowAcc(){
     //! computing drainage area
-    //#pragma omp parallel 
-    {
-      const int tnum           = omp_get_thread_num();
-      const int twidth         = 2*size/omp_get_num_threads(); //TODO: Need a constant
-      const int toffset        = tnum*twidth;
-      const int tlwidth        = size/omp_get_num_threads();   //TODO: Need a constant
-      const int tloffset       = tnum*tlwidth;
-      const int *const tstack  = &stack[toffset];
-      const int *const tlevels = &levels[tloffset];
-      const int &tnlevel       = nlevel[tnum];
+    const int tnum = omp_get_thread_num();
+    auto tstack    = &stack[tnum*t_stack_width];
+    auto tlevels   = &levels[tnum*t_level_width];
+    int &tnlevel   = nlevel[tnum];
 
-      for(int i=tlevels[0];i<tlevels[tnlevel-1];i++){
-        const int c = tstack[i];
-        accum[c] = cell_area;
-      }
-
-      for(int li=tnlevel-2;li>=0;li--){
-        for(int si=tlevels[li];si<tlevels[li+1];si++){
-          const int c = tstack[si];
-
-          if(rec[c]!=NO_FLOW){
-            const int n = c+nshift[rec[c]];
-            accum[n]   += accum[c];
-          }
-        }
-      }    
+    for(int i=tlevels[0];i<tlevels[tnlevel-1];i++){
+      const int c = tstack[i];
+      accum[c] = cell_area;
     }
 
-    // for(int s=nstack-1;s>=0;s--){
-    //   const int c = stack[s];
-    //   if(rec[c]!=NO_FLOW){
-    //     const int n = c+nshift[rec[c]];
-    //     accum[n]   += accum[c];
-    //   }
-    // }    
+    for(int li=tnlevel-2;li>=0;li--){
+      for(int si=tlevels[li];si<tlevels[li+1];si++){
+        const int c = tstack[si];
+
+        if(rec[c]!=NO_FLOW){
+          const int n = c+nshift[rec[c]];
+          accum[n]   += accum[c];
+        }
+      }
+    }    
   }
 
 
   void AddUplift(){
-    const int tnum           = omp_get_thread_num();
-    const int twidth         = 2*size/omp_get_num_threads(); //TODO: Need a constant
-    const int toffset        = tnum*twidth;
-    const int tlwidth        = size/omp_get_num_threads();   //TODO: Need a constant
-    const int tloffset       = tnum*tlwidth;
-    const int *const tstack  = &stack[toffset];
-    const int *const tlevels = &levels[tloffset];
-    const int &tnlevel       = nlevel[tnum];
-
-    // for(int i=tlevels[0];i<tlevels[tnlevel-1];i++)
-    //   h[tstack[i]] += ueq*dt;
+    const int tnum = omp_get_thread_num();
+    auto tstack    = &stack[tnum*t_stack_width];
+    auto tlevels   = &levels[tnum*t_level_width];
+    int &tnlevel   = nlevel[tnum];
 
     //Start at tlevels[1] so we don't elevate the outer edge
     for(int i=tlevels[1];i<tlevels[tnlevel-1];i++){
       const int c = tstack[i];
-      h[c] += ueq*dt; 
+      h[c]       += ueq*dt; 
     }
-
-    // //! adding uplift to landscape
-    // #pragma omp for collapse(2) schedule(static)
-    // for(int y=2;y<height-2;y++)
-    // for(int x=2;x<width-2;x++){
-    //   const int c = y*width+x;
-    //   h[c] += ueq*dt;
-    // }
   }
 
 
   void Erode(){
-    //#pragma omp parallel 
-    {
-      const int tnum     = omp_get_thread_num();
-      const int twidth   = 2*size/omp_get_num_threads(); //TODO: Need a constant
-      const int toffset  = tnum*twidth;
-      const int tlwidth  = size/omp_get_num_threads();   //TODO: Need a constant
-      const int tloffset = tnum*tlwidth;
-      int *const tstack  = &stack[toffset];
-      int *const tlevels = &levels[tloffset];
-      int &tnlevel       = nlevel[tnum];
+    const int tnum = omp_get_thread_num();
+    auto tstack    = &stack[tnum*t_stack_width];
+    auto tlevels   = &levels[tnum*t_level_width];
+    int &tnlevel   = nlevel[tnum];
 
-      //#pragma omp parallel default(none)
-      for(int li=0;li<tnlevel-1;li++){
-        for(int si=tlevels[li];si<tlevels[li+1];si++){
-          const int c = tstack[si];          //Cell from which flow originates
-          if(rec[c]==NO_FLOW)
-            continue;
-          const int n = c+nshift[rec[c]];   //Cell receiving the flow
+    //#pragma omp parallel default(none)
+    for(int li=0;li<tnlevel-1;li++){
+      for(int si=tlevels[li];si<tlevels[li+1];si++){
+        const int c = tstack[si];          //Cell from which flow originates
+        if(rec[c]==NO_FLOW)
+          continue;
+        const int n = c+nshift[rec[c]];    //Cell receiving the flow
 
-          const double length = dr[rec[c]];
-          const double fact   = keq*dt*std::pow(accum[c],meq)/std::pow(length,neq);
-          const double h0     = h[c];      //Elevation of focal cell
-          const double hn     = h[n];      //Elevation of neighbouring (receiving, lower) cell
-          double hnew         = h0;        //Current updated value of focal cell
-          double hp           = h0;        //Previous updated value of focal cell
-          double diff         = 2*tol;     //Difference between current and previous updated values
-          while(std::abs(diff)>tol){
-            hnew -= (hnew-h0+fact*std::pow(hnew-hn,neq))/(1.+fact*neq*std::pow(hnew-hn,neq-1));
-            diff  = hnew - hp;
-            hp    = hnew;
-          }
-          h[c] = hnew;
+        const double length = dr[rec[c]];
+        const double fact   = keq*dt*std::pow(accum[c],meq)/std::pow(length,neq);
+        const double h0     = h[c];        //Elevation of focal cell
+        const double hn     = h[n];        //Elevation of neighbouring (receiving, lower) cell
+        double hnew         = h0;          //Current updated value of focal cell
+        double hp           = h0;          //Previous updated value of focal cell
+        double diff         = 2*tol;       //Difference between current and previous updated values
+        while(std::abs(diff)>tol){
+          hnew -= (hnew-h0+fact*std::pow(hnew-hn,neq))/(1.+fact*neq*std::pow(hnew-hn,neq-1));
+          diff  = hnew - hp;
+          hp    = hnew;
         }
+        h[c] = hnew;
       }
     }
   }
@@ -426,9 +393,9 @@ class FastScape_RBPQ {
     accum  = new double[size];
     rec    = new int[size];
     ndon   = new int[size];
-    stack  = new int[2*size]; //TODO: Explain
     donor  = new int[8*size];
-    nlevel = new int[omp_get_num_threads()];
+    stack  = new int[omp_get_max_threads()*t_stack_width]; //TODO: Explain
+    nlevel = new int[omp_get_max_threads()];
 
     //It's difficult to know how much memory should be allocated for levels. For
     //a square DEM with isotropic dispersion this is approximately sqrt(E/2). A
@@ -436,7 +403,7 @@ class FastScape_RBPQ {
     //levels. A tortorously sinuous river may have up to E*E levels. We
     //compromise and choose a number of levels equal to the perimiter because
     //why not?
-    levels = new int[size]; //TODO: Make smaller to `2*width+2*height`
+    levels = new int[omp_get_max_threads()*t_level_width]; //TODO: Make smaller to `2*width+2*height`
 
     //! initializing rec
     #pragma omp parallel
