@@ -9,7 +9,6 @@
 #include <omp.h>
 #include <vector>
 #include "CumulativeTimer.hpp"
-#include "Timer.hpp"
 
 #ifndef _OPENMP
   #define omp_get_thread_num()  0
@@ -429,7 +428,7 @@ class FastScape_RBPQ {
 
       #pragma omp master
       if( step%20==0 )
-        std::cerr<<step<<std::endl;
+        std::cout<<"p Step = "<<step<<std::endl;
     }
 
     Tmr_Overall.stop();
@@ -468,17 +467,25 @@ class FastScape_RBPQ {
 
 
 
-int main(){
+int main(int argc, char **argv){
   //feenableexcept(FE_ALL_EXCEPT);
 
-  const int width  = 501;
-  const int height = 501;
-  const int nstep  = 120;
+  if(argc!=3){
+    std::cerr<<"Syntax: "<<argv[0]<<" <Dimension> <Steps>"<<std::endl;
+    return -1;
+  }
 
-  Timer tmr;
+  std::cout<<"A FastScape B&W"<<std::endl;
+  std::cout<<"C Richard Barnes TODO"<<std::endl;
+
+  const int width  = std::stoi(argv[1]);
+  const int height = std::stoi(argv[1]);
+  const int nstep  = std::stoi(argv[2]);
+
+  CumulativeTimer tmr(true);
   FastScape_RBPQ tm(width,height);
   tm.run(nstep);
-  std::cout<<"Calculation time = "<<tmr.elapsed()<<std::endl;
+  std::cout<<"t Total calculation time    = "<<std::setw(15)<<tmr.elapsed()<<" microseconds"<<std::endl;
 
   PrintDEM("out_RB+PQ.dem", tm.getH(), width, height);
 
