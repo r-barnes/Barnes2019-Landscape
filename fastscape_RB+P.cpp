@@ -411,7 +411,7 @@ int main(int argc, char **argv){
     return -1;
   }
 
-  std::cout<<"A FastScape B&W"<<std::endl;
+  std::cout<<"A FastScape RB+P"<<std::endl;
   std::cout<<"C Richard Barnes TODO"<<std::endl;
 
   const int width  = std::stoi(argv[1]);
