@@ -252,7 +252,7 @@ class FastScape_RBPQ {
 
     //TODO: These loops are just a safety feature
     for(int i=0;i<t_stack_width;i++)
-      tstack[i] = -1;;
+      tstack[i]  = -1;
     for(int i=0;i<t_level_width;i++)
       tlevels[i] = -1;
 
