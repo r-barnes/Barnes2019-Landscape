@@ -1,7 +1,10 @@
 #include "CumulativeTimer.hpp"
 #include <stdexcept>
 
-CumulativeTimer::CumulativeTimer(){}
+CumulativeTimer::CumulativeTimer(bool started){
+  if(started)
+    start();
+}
 
 void CumulativeTimer::start(){
   #pragma omp master

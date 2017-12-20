@@ -12,7 +12,7 @@ class CumulativeTimer {
   uint64_t cumulative_time = 0;
   bool     running = false;
  public:
-  CumulativeTimer  ();
+  CumulativeTimer  (bool started=false);
   void     start   ();
   void     stop    ();
   void     reset   ();
