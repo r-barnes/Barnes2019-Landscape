@@ -1,0 +1,41 @@
+#!/usr/bin/env python3
+import sys
+import argparse
+import re
+import csv
+import io
+from tabulate import tabulate
+
+def main():
+  parser = argparse.ArgumentParser(description='Tranpose a table of data')
+  parser.add_argument('-s','--start',     help='Character that starts an observation', required=True, type=str)
+  parser.add_argument('infile', nargs='?', type=argparse.FileType('r'), default=sys.stdin)
+
+  args = parser.parse_args()
+
+  lines = args.infile.readlines()
+
+  data  = []
+  datum = {}
+  for line in lines:
+    if line[0]==args.start:
+      if datum:
+        data.append(datum)
+      datum = {}
+
+    rem = re.match(r'(.) ([^=]+)=?\s*([^ ]*)\s*(.*)', line);
+    tag = rem.group(1).strip()
+    col = rem.group(2).strip()
+    val = rem.group(3).strip()
+
+    if tag=='A':
+      datum['Algorithm'] = col.replace(' ','_')
+    elif tag in ['p', 'C']:
+      pass
+    else:
+      col        = col.replace(':','').replace(' ','_')
+      datum[col] = val
+
+  print(tabulate(data, headers="keys", tablefmt='plain'))
+
+main()

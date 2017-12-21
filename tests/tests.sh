@@ -2,11 +2,13 @@
 
 #Edge length of a dataset. Number of cells is the square of this value.
 sizes=( 100 700 1000 7000 10000 ) 
-sizes=( 100 )
+sizes=( 200 500 1000 )
 
 #Number of repetitions for each dataset size. Statistical significance!
 reps=( 10 10 10 10 10 )           
-reps=( 1 1 1 1 1 )           
+reps=( 2 2 2 2 2 )   
+
+steps=120        
 
 #Programs to run
 exe_prefix=../
@@ -20,11 +22,12 @@ for prog in "${progs[@]}"; do
 for (( s=0;   s<${#sizes[@]}; s++ )); do
 for (( rep=0; rep<${reps[s]}; rep++ )); do
   size=${sizes[s]}
-  echo "# Prog = $prog"
-  echo "m Size = $size"
-  echo "m Rep  = $rep"
+  echo "# Prog  = $prog"
+  echo "m Size  = $size"
+  echo "m Steps = $steps"
+  echo "m Rep   = $rep"
 
-  eval "$exe_prefix$prog $size 50"
+  eval "$exe_prefix$prog $size $steps"
 done
 done
 done
