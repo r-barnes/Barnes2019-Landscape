@@ -119,8 +119,8 @@ class FastScape_RBPQ {
 
     h      = new double[size];
 
-    t_stack_width = 2*size/omp_get_max_threads(); //TODO: Explain
-    t_level_width = size/omp_get_max_threads();   //TODO: Explain, make smaller
+    t_stack_width = std::max(100,2*size/omp_get_max_threads()); //TODO: Explain
+    t_level_width = std::max(100,size/omp_get_max_threads());   //TODO: Explain, make smaller
 
     GenerateRandomTerrain();
 
