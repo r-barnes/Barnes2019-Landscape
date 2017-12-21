@@ -37,8 +37,6 @@ void PrintDEM(
 
 class FastScape_BWP {
  private:
-  static constexpr double DINFTY  = std::numeric_limits<double>::infinity();
-
   const int    NO_FLOW = -1;
   const double SQRT2   = 1.414213562373095048801688724209698078569671875376948;
 
@@ -68,6 +66,11 @@ class FastScape_BWP {
   int    *donor;    //Indices of a cell's donor cells
   int    *ndon;     //How many donors a cell has
   int    *stack;    //Indices of cells in the order they should be processed
+
+  //nshift offsets:
+  //1 2 3
+  //0   4
+  //7 6 5
   int    nshift[8]; //Offset from a focal cell's index to its neighbours
 
   std::vector<int>    stack_start;
@@ -75,7 +78,7 @@ class FastScape_BWP {
   CumulativeTimer Tmr_Step1_Initialize;
   CumulativeTimer Tmr_Step2_DetermineReceivers;
   CumulativeTimer Tmr_Step3_DetermineDonors;
-  CumulativeTimer Tmr_Step4_GenerateStack;
+  CumulativeTimer Tmr_Step4_GenerateOrder;
   CumulativeTimer Tmr_Step5_FlowAcc;
   CumulativeTimer Tmr_Step6_Uplift;
   CumulativeTimer Tmr_Step7_Erosion;
@@ -127,6 +130,8 @@ class FastScape_BWP {
 
   void printDiagnostic(){
     return;
+    std::cerr<<"\n#################\n"<<msg<<std::endl;
+
     std::cerr<<"idx: "<<std::endl;
     for(int y=0;y<height;y++){
       for(int x=0;x<width;x++){
@@ -163,7 +168,7 @@ class FastScape_BWP {
       for(int x=0;x<width;x++){
         const int c = y*width+x;
         for(int ni=0;ni<8;ni++)
-          std::cerr<<std::setw(3)<<donor[c+ni];
+          std::cerr<<std::setw(3)<<donor[8*c+ni];
         std::cerr<<"|";
       }
       std::cerr<<"\n";
@@ -228,7 +233,7 @@ class FastScape_BWP {
   }
 
 
-  void GenerateStack(){
+  void GenerateOrder(){
     //The `stack_start` array has an unpredictable size, so we fill it
     //dynamically and reset it each time. This should have minimal impact on the
     //algorithm's speed since std::vector's memory is not actually reallocated.    
@@ -323,7 +328,7 @@ class FastScape_BWP {
     for(int step=0;step<=nstep;step++){
       Tmr_Step2_DetermineReceivers.start ();   ComputeReceivers  (); Tmr_Step2_DetermineReceivers.stop ();
       Tmr_Step3_DetermineDonors.start    ();   ComputeDonors     (); Tmr_Step3_DetermineDonors.stop    ();
-      Tmr_Step4_GenerateStack.start      ();   GenerateStack     (); Tmr_Step4_GenerateStack.stop      ();
+      Tmr_Step4_GenerateOrder.start      ();   GenerateOrder     (); Tmr_Step4_GenerateOrder.stop      ();
       Tmr_Step5_FlowAcc.start            ();   ComputeFlowAcc    (); Tmr_Step5_FlowAcc.stop            ();
       Tmr_Step6_Uplift.start             ();   AddUplift         (); Tmr_Step6_Uplift.stop             ();
       Tmr_Step7_Erosion.start            ();   Erode             (); Tmr_Step7_Erosion.stop            ();
@@ -343,7 +348,7 @@ class FastScape_BWP {
     std::cout<<"t Step1: Initialize         = "<<std::setw(15)<<Tmr_Step1_Initialize.elapsed()         <<" microseconds"<<std::endl;                 
     std::cout<<"t Step2: DetermineReceivers = "<<std::setw(15)<<Tmr_Step2_DetermineReceivers.elapsed() <<" microseconds"<<std::endl;                         
     std::cout<<"t Step3: DetermineDonors    = "<<std::setw(15)<<Tmr_Step3_DetermineDonors.elapsed()    <<" microseconds"<<std::endl;                      
-    std::cout<<"t Step4: GenerateOrder      = "<<std::setw(15)<<Tmr_Step4_GenerateStack.elapsed()      <<" microseconds"<<std::endl;                    
+    std::cout<<"t Step4: GenerateOrder      = "<<std::setw(15)<<Tmr_Step4_GenerateOrder.elapsed()      <<" microseconds"<<std::endl;                    
     std::cout<<"t Step5: FlowAcc            = "<<std::setw(15)<<Tmr_Step5_FlowAcc.elapsed()            <<" microseconds"<<std::endl;              
     std::cout<<"t Step6: Uplift             = "<<std::setw(15)<<Tmr_Step6_Uplift.elapsed()             <<" microseconds"<<std::endl;             
     std::cout<<"t Step7: Erosion            = "<<std::setw(15)<<Tmr_Step7_Erosion.elapsed()            <<" microseconds"<<std::endl;              
