@@ -256,8 +256,8 @@ class FastScape_RBPQ {
       tlevels[i] = -1;
 
     int tnstack = 0; //Thread local
-    tlevels[0] = 0;
-    tnlevel    = 1;
+    tlevels[0]  = 0;
+    tnlevel     = 1;
 
     //Outer edge
     #pragma omp for schedule(static) nowait
