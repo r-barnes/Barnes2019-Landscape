@@ -31,7 +31,8 @@ if [ ! -f z_serial_comparison.dat ]; then
     echo "m Rep   = $rep"
     echo "H host  = $host"
 
-    eval "$exe_prefix$prog $size $steps"
+    echo "$exe_prefix$prog $size $steps out_${prog}_${size}_${steps}_${rep}.dem"
+    eval "$exe_prefix$prog $size $steps out_${prog}_${size}_${steps}_${rep}.dem"
   done
   done
   done > >(tee -i z_serial_comparison.dat)
