@@ -179,6 +179,7 @@ class FastScape_RBP {
  private:
   void ComputeReceivers(){
     //! computing receiver array
+    #pragma omp parallel for collapse(2)
     for(int y=2;y<height-2;y++)
     for(int x=2;x<width-2;x++){
       const int c      = y*width+x;
@@ -205,13 +206,27 @@ class FastScape_RBP {
     for(int i=0;i<size;i++)
       ndon[i] = 0;
 
-    //! computing donor arrays
-    for(int c=0;c<size;c++){
-      if(rec[c]==NO_FLOW)
-        continue;
-      const auto n       = c+nshift[rec[c]];
-      donor[8*n+ndon[n]] = c;
-      ndon[n]++;
+    //The B&W method of developing the donor array has each focal cell F inform
+    //its receiving cell R that F is a donor of R. Unfortunately, parallelizing
+    //this is difficult because more than one cell might be informing R at any
+    //given time. Atomics are a solution, but they impose a performance cost
+    //(though using the latest and greatest hardware decreases this penalty).
+
+    //Instead, we invert the operation. Each focal cell now examines its
+    //neighbours to see if it receives from them. Each focal cell is then
+    //guaranteed to have sole write-access to its location in the donor array.
+
+    #pragma omp parallel for collapse(2)
+    for(int y=1;y<height-1;y++)
+    for(int x=1;x<width-1;x++){
+      const int c = y*width+x;
+      for(int ni=0;ni<8;ni++){
+        const int n = c+nshift[ni];
+        if(rec[n]!=NO_FLOW && n+nshift[rec[n]]==c){
+          donor[8*c+ndon[c]] = n;
+          ndon[c]++;
+        }
+      }
     }
   }
 
@@ -251,18 +266,31 @@ class FastScape_RBP {
     for(int i=0;i<size;i++)
       accum[i] = cell_area;
 
-    for(int s=size-1;s>=0;s--){
-      const int c = stack[s];
-      if(rec[c]!=NO_FLOW){
-        const int n = c+nshift[rec[c]];
-        accum[n]   += accum[c];
+    for(int li=nlevel-2;li>=0;li--){
+      #pragma omp parallel for default(none) shared(li)
+      for(int si=levels[li];si<levels[li+1];si++){
+        const int c = stack[si];
+
+        if(rec[c]!=NO_FLOW){
+          const int n = c+nshift[rec[c]];
+          accum[n]   += accum[c];
+        }
       }
     }    
+
+    // for(int s=nstack-1;s>=0;s--){
+    //   const int c = stack[s];
+    //   if(rec[c]!=NO_FLOW){
+    //     const int n = c+nshift[rec[c]];
+    //     accum[n]   += accum[c];
+    //   }
+    // }    
   }
 
 
   void AddUplift(){
     //! adding uplift to landscape
+    #pragma omp parallel for collapse(2)
     for(int y=2;y<height-2;y++)
     for(int x=2;x<width-2;x++){
       const int c = y*width+x;

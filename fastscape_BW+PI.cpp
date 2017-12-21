@@ -1,3 +1,6 @@
+//This file contains a serial implementation of Braun and Willett's FastScape
+//algorithm. The implementation was developed by adapting Fortran code provided
+//by Braun and attempts to be a faithful reproduction of the ideas therein.
 #include <cmath>
 #include <cstdlib>
 #include <fenv.h> //Used to catch floating point NaN issues
@@ -32,8 +35,10 @@ void PrintDEM(
 
 
 
-class FastScape_RBP {
+class FastScape_BWP {
  private:
+  static constexpr double DINFTY  = std::numeric_limits<double>::infinity();
+
   const int    NO_FLOW = -1;
   const double SQRT2   = 1.414213562373095048801688724209698078569671875376948;
 
@@ -65,14 +70,8 @@ class FastScape_RBP {
   int    *stack;    //Indices of cells in the order they should be processed
   int    nshift[8]; //Offset from a focal cell's index to its neighbours
 
-  //nshift offsets:
-  //1 2 3
-  //0   4
-  //7 6 5
+  std::vector<int>    stack_start;
 
-  int    *levels;   //Indices of locations in stack where a level begins and ends
-  int    nlevel;    //Number of levels used
-  
   CumulativeTimer Tmr_Step1_Initialize;
   CumulativeTimer Tmr_Step2_DetermineReceivers;
   CumulativeTimer Tmr_Step3_DetermineDonors;
@@ -92,14 +91,12 @@ class FastScape_RBP {
       h[c]  = rand()/(double)RAND_MAX;
       if(x == 0 || y==0 || x==width-1 || y==height-1)
         h[c] = 0;
-      if(x == 1 || y==1 || x==width-2 || y==height-2)
-        h[c] = 0;
     }
   }  
 
 
  public:
-  FastScape_RBP(const int width0, const int height0)
+  FastScape_BWP(const int width0, const int height0)
     : nshift{-1,-width0-1,-width0,-width0+1,1,width0+1,width0,width0-1}
   {
     Tmr_Overall.start();
@@ -107,6 +104,14 @@ class FastScape_RBP {
     width  = width0;
     height = height0;
     size   = width*height;
+
+    //Each edge node of the DEM is the root of a stack. The `stack_start` array
+    //indicates where these nodes are located in the global stack. This is then
+    //used to induce parallelism. Note that, especially at the beginning of the
+    //program, there may be interior nodes with in depressions or with no local
+    //gradient. These may become the starts of stacks as well, so the
+    //`stack_start` array may be larger than just the perimeter of the DEM.
+    stack_start.reserve(3*width+2*height);
 
     h      = new double[size];
 
@@ -116,14 +121,12 @@ class FastScape_RBP {
     Tmr_Overall.stop();
   }
 
-  ~FastScape_RBP(){
+  ~FastScape_BWP(){
     delete[] h;
   }
 
-  void printDiagnostic(std::string msg){
+  void printDiagnostic(){
     return;
-    std::cerr<<"\n#################\n"<<msg<<std::endl;
-
     std::cerr<<"idx: "<<std::endl;
     for(int y=0;y<height;y++){
       for(int x=0;x<width;x++){
@@ -160,7 +163,7 @@ class FastScape_RBP {
       for(int x=0;x<width;x++){
         const int c = y*width+x;
         for(int ni=0;ni<8;ni++)
-          std::cerr<<std::setw(3)<<donor[8*c+ni];
+          std::cerr<<std::setw(3)<<donor[c+ni];
         std::cerr<<"|";
       }
       std::cerr<<"\n";
@@ -179,8 +182,9 @@ class FastScape_RBP {
  private:
   void ComputeReceivers(){
     //! computing receiver array
-    for(int y=2;y<height-2;y++)
-    for(int x=2;x<width-2;x++){
+    #pragma omp parallel for collapse(2)
+    for(int y=1;y<height-1;y++)
+    for(int x=1;x<width-1;x++){
       const int c      = y*width+x;
 
       //The slope must be greater than zero for there to be downhill flow;
@@ -196,7 +200,7 @@ class FastScape_RBP {
         }
       }
       rec[c] = max_n;
-    }    
+    }   
   }
 
 
@@ -215,34 +219,33 @@ class FastScape_RBP {
     }
   }
 
-  void GenerateQueue(){
-    int nstack = 0;
-    int qpoint = 0;
 
-    levels[0] = 0;
-    nlevel    = 1;
+  void FindStack(const int c, int &nstack){
+    for(int k=0;k<ndon[c];k++){
+      const auto n    = donor[8*c+k];
+      stack[nstack++] = n;
+      FindStack(n,nstack);
+    }
+  }
 
-    //TODO: Outside edge is always NO_FLOW. Maybe this can get loaded once?
-    //Load cells without dependencies into the queue
+
+  void GenerateStack(){
+    //The `stack_start` array has an unpredictable size, so we fill it
+    //dynamically and reset it each time. This should have minimal impact on the
+    //algorithm's speed since std::vector's memory is not actually reallocated.    
+    stack_start.clear();
+
+    int nstack=0;
     for(int c=0;c<size;c++){
-      if(rec[c]==NO_FLOW)
+      if(rec[c]==NO_FLOW){
+        stack_start.push_back(nstack);
         stack[nstack++] = c;
-    }
-    levels[nlevel++] = nstack; //Last cell of this level
-
-    while(qpoint<nstack){
-      const auto c = stack[qpoint];
-      for(int k=0;k<ndon[c];k++){
-        const auto n    = donor[8*c+k];
-        stack[nstack++] = n;
+        FindStack(c,nstack);
       }
-
-      //TODO: What's this about, then?
-      qpoint++;
-      if(qpoint==levels[nlevel-1] && nstack!=levels[nlevel-1])
-        levels[nlevel++] = nstack; //Starting a new level      
-    }
-    // std::cerr<<"nstack final = "<<nstack<<std::endl;
+    }  
+    //We add an additional note to the end of `stack_start` that serves as an
+    //upper bound on the locations of the cells in the final stack. See b    
+    stack_start.push_back(nstack);
   }
 
 
@@ -257,29 +260,28 @@ class FastScape_RBP {
         const int n = c+nshift[rec[c]];
         accum[n]   += accum[c];
       }
-    }    
-  }
+    }   
+  } 
 
 
   void AddUplift(){
     //! adding uplift to landscape
-    for(int y=2;y<height-2;y++)
-    for(int x=2;x<width-2;x++){
+    #pragma omp parallel for collapse(2)
+    for(int y=1;y<height-1;y++)
+    for(int x=1;x<width-1;x++){
       const int c = y*width+x;
       h[c] += ueq*dt;
-    }
+    }    
   }
 
 
   void Erode(){
-    //#pragma omp parallel default(none)
-    for(int li=0;li<nlevel-1;li++){
-      const int lvlstart = levels[li];
-      const int lvlend   = levels[li+1];
-      const int lvlsize  = lvlend-lvlstart;
-      #pragma omp parallel for if(lvlstart>2000)
-      for(int si=levels[li];si<levels[li+1];si++){
-        const int c = stack[si];          //Cell from which flow originates
+    #pragma omp parallel for schedule(dynamic)
+    for(int ss=0;ss<stack_start.size()-1;ss++){
+      const int sstart = stack_start.at(ss);
+      const int send   = stack_start.at(ss+1);
+      for(int s=sstart;s<send;s++){
+        const int c = stack[s];           //Cell from which flow originates
         if(rec[c]==NO_FLOW)
           continue;
         const int n = c+nshift[rec[c]];   //Cell receiving the flow
@@ -314,14 +316,6 @@ class FastScape_RBP {
     stack  = new int[size];
     donor  = new int[8*size];
 
-    //It's difficult to know how much memory should be allocated for levels. For
-    //a square DEM with isotropic dispersion this is approximately sqrt(E/2). A
-    //diagonally tilted surface with isotropic dispersion may have sqrt(E)
-    //levels. A tortorously sinuous river may have up to E*E levels. We
-    //compromise and choose a number of levels equal to the perimiter because
-    //why not?
-    levels = new int[size]; //TODO: Make smaller to `2*width+2*height`
-
     //! initializing rec
     for(int i=0;i<size;i++)
       rec[i] = NO_FLOW;
@@ -331,7 +325,7 @@ class FastScape_RBP {
     for(int step=0;step<=nstep;step++){
       Tmr_Step2_DetermineReceivers.start ();   ComputeReceivers  (); Tmr_Step2_DetermineReceivers.stop ();
       Tmr_Step3_DetermineDonors.start    ();   ComputeDonors     (); Tmr_Step3_DetermineDonors.stop    ();
-      Tmr_Step4_GenerateStack.start      ();   GenerateQueue     (); Tmr_Step4_GenerateStack.stop      ();
+      Tmr_Step4_GenerateStack.start      ();   GenerateStack     (); Tmr_Step4_GenerateStack.stop      ();
       Tmr_Step5_FlowAcc.start            ();   ComputeFlowAcc    (); Tmr_Step5_FlowAcc.stop            ();
       Tmr_Step6_Uplift.start             ();   AddUplift         (); Tmr_Step6_Uplift.stop             ();
       Tmr_Step7_Erosion.start            ();   Erode             (); Tmr_Step7_Erosion.stop            ();
@@ -345,7 +339,6 @@ class FastScape_RBP {
     delete[] ndon;
     delete[] stack;
     delete[] donor;
-    delete[] levels;
 
     Tmr_Overall.stop();
 
@@ -359,10 +352,6 @@ class FastScape_RBP {
     std::cout<<"t Overall                   = "<<std::setw(15)<<Tmr_Overall.elapsed()                  <<" microseconds"<<std::endl;        
   }
 
-      // std::cerr<<"Levels: ";
-      // for(auto &l: levels)
-      //   std::cerr<<l<<" ";
-      // std::cerr<<std::endl;
 
   double* getH() const {
     return h;
@@ -383,7 +372,7 @@ int main(int argc, char **argv){
     return -1;
   }
 
-  std::cout<<"A FastScape RB+P"<<std::endl;
+  std::cout<<"A FastScape B&W+P"<<std::endl;
   std::cout<<"C Richard Barnes TODO"<<std::endl;
 
   const int width  = std::stoi(argv[1]);
@@ -391,11 +380,11 @@ int main(int argc, char **argv){
   const int nstep  = std::stoi(argv[2]);
 
   CumulativeTimer tmr(true);
-  FastScape_RBP tm(width,height);
+  FastScape_BWP tm(width,height);
   tm.run(nstep);
   std::cout<<"t Total calculation time    = "<<std::setw(15)<<tmr.elapsed()<<" microseconds"<<std::endl;
 
-  PrintDEM("out_RB+P.dem", tm.getH(), width, height);
+  PrintDEM("out_BW+P.dem", tm.getH(), width, height);
 
   return 0;
 }

@@ -182,7 +182,6 @@ class FastScape_BWP {
  private:
   void ComputeReceivers(){
     //! computing receiver array
-    #pragma omp parallel for collapse(2)
     for(int y=1;y<height-1;y++)
     for(int x=1;x<width-1;x++){
       const int c      = y*width+x;
@@ -266,7 +265,6 @@ class FastScape_BWP {
 
   void AddUplift(){
     //! adding uplift to landscape
-    #pragma omp parallel for collapse(2)
     for(int y=1;y<height-1;y++)
     for(int x=1;x<width-1;x++){
       const int c = y*width+x;
