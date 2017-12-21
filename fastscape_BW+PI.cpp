@@ -35,10 +35,8 @@ void PrintDEM(
 
 
 
-class FastScape_BWP {
+class FastScape_BWPF {
  private:
-  static constexpr double DINFTY  = std::numeric_limits<double>::infinity();
-
   const int    NO_FLOW = -1;
   const double SQRT2   = 1.414213562373095048801688724209698078569671875376948;
 
@@ -68,6 +66,11 @@ class FastScape_BWP {
   int    *donor;    //Indices of a cell's donor cells
   int    *ndon;     //How many donors a cell has
   int    *stack;    //Indices of cells in the order they should be processed
+
+  //nshift offsets:
+  //1 2 3
+  //0   4
+  //7 6 5
   int    nshift[8]; //Offset from a focal cell's index to its neighbours
 
   std::vector<int>    stack_start;
@@ -91,12 +94,14 @@ class FastScape_BWP {
       h[c]  = rand()/(double)RAND_MAX;
       if(x == 0 || y==0 || x==width-1 || y==height-1)
         h[c] = 0;
+      if(x == 1 || y==1 || x==width-2 || y==height-2)
+        h[c] = 0;
     }
   }  
 
 
  public:
-  FastScape_BWP(const int width0, const int height0)
+  FastScape_BWPF(const int width0, const int height0)
     : nshift{-1,-width0-1,-width0,-width0+1,1,width0+1,width0,width0-1}
   {
     Tmr_Overall.start();
@@ -121,12 +126,14 @@ class FastScape_BWP {
     Tmr_Overall.stop();
   }
 
-  ~FastScape_BWP(){
+  ~FastScape_BWPF(){
     delete[] h;
   }
 
-  void printDiagnostic(){
+  void printDiagnostic(std::string msg){
     return;
+    std::cerr<<"\n#################\n"<<msg<<std::endl;
+
     std::cerr<<"idx: "<<std::endl;
     for(int y=0;y<height;y++){
       for(int x=0;x<width;x++){
@@ -163,7 +170,7 @@ class FastScape_BWP {
       for(int x=0;x<width;x++){
         const int c = y*width+x;
         for(int ni=0;ni<8;ni++)
-          std::cerr<<std::setw(3)<<donor[c+ni];
+          std::cerr<<std::setw(3)<<donor[8*c+ni];
         std::cerr<<"|";
       }
       std::cerr<<"\n";
@@ -183,8 +190,8 @@ class FastScape_BWP {
   void ComputeReceivers(){
     //! computing receiver array
     #pragma omp parallel for collapse(2)
-    for(int y=1;y<height-1;y++)
-    for(int x=1;x<width-1;x++){
+    for(int y=2;y<height-2;y++)
+    for(int x=2;x<width-2;x++){
       const int c      = y*width+x;
 
       //The slope must be greater than zero for there to be downhill flow;
@@ -205,17 +212,28 @@ class FastScape_BWP {
 
 
   void ComputeDonors(){
-    //! initialising number of donors per node to 0
-    for(int i=0;i<size;i++)
-      ndon[i] = 0;
+    //The B&W method of developing the donor array has each focal cell F inform
+    //its receiving cell R that F is a donor of R. Unfortunately, parallelizing
+    //this is difficult because more than one cell might be informing R at any
+    //given time. Atomics are a solution, but they impose a performance cost
+    //(though using the latest and greatest hardware decreases this penalty).
 
-    //! computing donor arrays
-    for(int c=0;c<size;c++){
-      if(rec[c]==NO_FLOW)
-        continue;
-      const auto n       = c+nshift[rec[c]];
-      donor[8*n+ndon[n]] = c;
-      ndon[n]++;
+    //Instead, we invert the operation. Each focal cell now examines its
+    //neighbours to see if it receives from them. Each focal cell is then
+    //guaranteed to have sole write-access to its location in the donor array.
+
+    #pragma omp parallel for collapse(2)
+    for(int y=1;y<height-1;y++)
+    for(int x=1;x<width-1;x++){
+      const int c = y*width+x;
+      ndon[c] = 0;
+      for(int ni=0;ni<8;ni++){
+        const int n = c+nshift[ni];
+        if(rec[n]!=NO_FLOW && n+nshift[rec[n]]==c){
+          donor[8*c+ndon[c]] = n;
+          ndon[c]++;
+        }
+      }
     }
   }
 
@@ -226,7 +244,7 @@ class FastScape_BWP {
       stack[nstack++] = n;
       FindStack(n,nstack);
     }
-  }
+  }  
 
 
   void GenerateOrder(){
@@ -267,8 +285,8 @@ class FastScape_BWP {
   void AddUplift(){
     //! adding uplift to landscape
     #pragma omp parallel for collapse(2)
-    for(int y=1;y<height-1;y++)
-    for(int x=1;x<width-1;x++){
+    for(int y=2;y<height-2;y++)
+    for(int x=2;x<width-2;x++){
       const int c = y*width+x;
       h[c] += ueq*dt;
     }    
@@ -313,8 +331,8 @@ class FastScape_BWP {
     accum  = new double[size];
     rec    = new int[size];
     ndon   = new int[size];
-    stack  = new int[size];
     donor  = new int[8*size];
+    stack  = new int[size];
 
     //! initializing rec
     for(int i=0;i<size;i++)
@@ -334,12 +352,6 @@ class FastScape_BWP {
         std::cout<<"p Step = "<<step<<std::endl;
     }
 
-    delete[] accum;
-    delete[] rec;
-    delete[] ndon;
-    delete[] stack;
-    delete[] donor;
-
     Tmr_Overall.stop();
 
     std::cout<<"t Step1: Initialize         = "<<std::setw(15)<<Tmr_Step1_Initialize.elapsed()         <<" microseconds"<<std::endl;                 
@@ -350,6 +362,12 @@ class FastScape_BWP {
     std::cout<<"t Step6: Uplift             = "<<std::setw(15)<<Tmr_Step6_Uplift.elapsed()             <<" microseconds"<<std::endl;             
     std::cout<<"t Step7: Erosion            = "<<std::setw(15)<<Tmr_Step7_Erosion.elapsed()            <<" microseconds"<<std::endl;              
     std::cout<<"t Overall                   = "<<std::setw(15)<<Tmr_Overall.elapsed()                  <<" microseconds"<<std::endl;        
+
+    delete[] accum;
+    delete[] rec;
+    delete[] ndon;
+    delete[] stack;
+    delete[] donor;
   }
 
 
@@ -381,7 +399,7 @@ int main(int argc, char **argv){
   const int nstep  = std::stoi(argv[2]);
 
   CumulativeTimer tmr(true);
-  FastScape_BWP tm(width,height);
+  FastScape_BWPF tm(width,height);
   tm.run(nstep);
   std::cout<<"t Total calculation time    = "<<std::setw(15)<<tmr.elapsed()<<" microseconds"<<std::endl;
 

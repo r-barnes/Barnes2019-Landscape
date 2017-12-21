@@ -69,7 +69,6 @@ class FastScape_RBPQ {
   int    *donor;    //Indices of a cell's donor cells
   int    *ndon;     //How many donors a cell has
   int    *stack;    //Indices of cells in the order they should be processed
-  int    nshift[8]; //Offset from a focal cell's index to its neighbours
 
   int    t_stack_width; //Number of stack entries available to each thread
   int    t_level_width; //Number of level entries available to each thread
@@ -78,6 +77,7 @@ class FastScape_RBPQ {
   //1 2 3
   //0   4
   //7 6 5
+  int    nshift[8]; //Offset from a focal cell's index to its neighbours
 
   int    *levels;   //Indices of locations in stack where a level begins and ends
   int    *nlevel;    //Number of levels used
@@ -471,13 +471,14 @@ class FastScape_RBPQ {
 int main(int argc, char **argv){
   //feenableexcept(FE_ALL_EXCEPT);
 
-  if(argc!=3){
-    std::cerr<<"Syntax: "<<argv[0]<<" <Dimension> <Steps>"<<std::endl;
+  if(argc!=4){
+    std::cerr<<"Syntax: "<<argv[0]<<" <Dimension> <Steps> <Output Name>"<<std::endl;
     return -1;
   }
 
   std::cout<<"A FastScape RB+PQ"<<std::endl;
   std::cout<<"C Richard Barnes TODO"<<std::endl;
+  std::cout<<"h "<<GIT_HASH<<std::endl;
 
   const int width  = std::stoi(argv[1]);
   const int height = std::stoi(argv[1]);
@@ -488,7 +489,7 @@ int main(int argc, char **argv){
   tm.run(nstep);
   std::cout<<"t Total calculation time    = "<<std::setw(15)<<tmr.elapsed()<<" microseconds"<<std::endl;
 
-  PrintDEM("out_RB+PQ.dem", tm.getH(), width, height);
+  PrintDEM(argv[3], tm.getH(), width, height);
 
   return 0;
 }

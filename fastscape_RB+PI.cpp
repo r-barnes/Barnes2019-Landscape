@@ -32,7 +32,7 @@ void PrintDEM(
 
 
 
-class FastScape_RBP {
+class FastScape_RBPF {
  private:
   const int    NO_FLOW = -1;
   const double SQRT2   = 1.414213562373095048801688724209698078569671875376948;
@@ -63,12 +63,12 @@ class FastScape_RBP {
   int    *donor;    //Indices of a cell's donor cells
   int    *ndon;     //How many donors a cell has
   int    *stack;    //Indices of cells in the order they should be processed
-  int    nshift[8]; //Offset from a focal cell's index to its neighbours
 
   //nshift offsets:
   //1 2 3
   //0   4
   //7 6 5
+  int    nshift[8]; //Offset from a focal cell's index to its neighbours
 
   int    *levels;   //Indices of locations in stack where a level begins and ends
   int    nlevel;    //Number of levels used
@@ -99,7 +99,7 @@ class FastScape_RBP {
 
 
  public:
-  FastScape_RBP(const int width0, const int height0)
+  FastScape_RBPF(const int width0, const int height0)
     : nshift{-1,-width0-1,-width0,-width0+1,1,width0+1,width0,width0-1}
   {
     Tmr_Overall.start();
@@ -116,7 +116,7 @@ class FastScape_RBP {
     Tmr_Overall.stop();
   }
 
-  ~FastScape_RBP(){
+  ~FastScape_RBPF(){
     delete[] h;
   }
 
@@ -202,10 +202,6 @@ class FastScape_RBP {
 
 
   void ComputeDonors(){
-    //! initialising number of donors per node to 0
-    for(int i=0;i<size;i++)
-      ndon[i] = 0;
-
     //The B&W method of developing the donor array has each focal cell F inform
     //its receiving cell R that F is a donor of R. Unfortunately, parallelizing
     //this is difficult because more than one cell might be informing R at any
@@ -220,6 +216,7 @@ class FastScape_RBP {
     for(int y=1;y<height-1;y++)
     for(int x=1;x<width-1;x++){
       const int c = y*width+x;
+      ndon[c] = 0;
       for(int ni=0;ni<8;ni++){
         const int n = c+nshift[ni];
         if(rec[n]!=NO_FLOW && n+nshift[rec[n]]==c){
@@ -270,21 +267,12 @@ class FastScape_RBP {
       #pragma omp parallel for default(none) shared(li)
       for(int si=levels[li];si<levels[li+1];si++){
         const int c = stack[si];
-
         if(rec[c]!=NO_FLOW){
           const int n = c+nshift[rec[c]];
           accum[n]   += accum[c];
         }
       }
     }    
-
-    // for(int s=nstack-1;s>=0;s--){
-    //   const int c = stack[s];
-    //   if(rec[c]!=NO_FLOW){
-    //     const int n = c+nshift[rec[c]];
-    //     accum[n]   += accum[c];
-    //   }
-    // }    
   }
 
 
@@ -300,13 +288,12 @@ class FastScape_RBP {
 
 
   void Erode(){
-    //#pragma omp parallel default(none)
     for(int li=0;li<nlevel-1;li++){
       const int lvlstart = levels[li];
       const int lvlend   = levels[li+1];
       const int lvlsize  = lvlend-lvlstart;
-      #pragma omp parallel for if(lvlstart>2000)
-      for(int si=levels[li];si<levels[li+1];si++){
+      #pragma omp parallel for if(lvlsize>500)
+      for(int si=lvlstart;si<lvlend;si++){
         const int c = stack[si];          //Cell from which flow originates
         if(rec[c]==NO_FLOW)
           continue;
@@ -339,8 +326,8 @@ class FastScape_RBP {
     accum  = new double[size];
     rec    = new int[size];
     ndon   = new int[size];
-    stack  = new int[size];
     donor  = new int[8*size];
+    stack  = new int[size];
 
     //It's difficult to know how much memory should be allocated for levels. For
     //a square DEM with isotropic dispersion this is approximately sqrt(E/2). A
@@ -368,13 +355,6 @@ class FastScape_RBP {
         std::cout<<"p Step = "<<step<<std::endl;
     }
 
-    delete[] accum;
-    delete[] rec;
-    delete[] ndon;
-    delete[] stack;
-    delete[] donor;
-    delete[] levels;
-
     Tmr_Overall.stop();
 
     std::cout<<"t Step1: Initialize         = "<<std::setw(15)<<Tmr_Step1_Initialize.elapsed()         <<" microseconds"<<std::endl;                 
@@ -385,6 +365,13 @@ class FastScape_RBP {
     std::cout<<"t Step6: Uplift             = "<<std::setw(15)<<Tmr_Step6_Uplift.elapsed()             <<" microseconds"<<std::endl;             
     std::cout<<"t Step7: Erosion            = "<<std::setw(15)<<Tmr_Step7_Erosion.elapsed()            <<" microseconds"<<std::endl;              
     std::cout<<"t Overall                   = "<<std::setw(15)<<Tmr_Overall.elapsed()                  <<" microseconds"<<std::endl;        
+
+    delete[] accum;
+    delete[] rec;
+    delete[] ndon;
+    delete[] stack;
+    delete[] donor;
+    delete[] levels;
   }
 
       // std::cerr<<"Levels: ";
@@ -420,7 +407,7 @@ int main(int argc, char **argv){
   const int nstep  = std::stoi(argv[2]);
 
   CumulativeTimer tmr(true);
-  FastScape_RBP tm(width,height);
+  FastScape_RBPF tm(width,height);
   tm.run(nstep);
   std::cout<<"t Total calculation time    = "<<std::setw(15)<<tmr.elapsed()<<" microseconds"<<std::endl;
 

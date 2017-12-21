@@ -130,7 +130,7 @@ class FastScape_BWP {
     delete[] h;
   }
 
-  void printDiagnostic(){
+  void printDiagnostic(std::string msg){
     return;
     std::cerr<<"\n#################\n"<<msg<<std::endl;
 
@@ -318,8 +318,8 @@ class FastScape_BWP {
     accum  = new double[size];
     rec    = new int[size];
     ndon   = new int[size];
-    stack  = new int[size];
     donor  = new int[8*size];
+    stack  = new int[size];
 
     //! initializing rec
     for(int i=0;i<size;i++)
@@ -339,12 +339,6 @@ class FastScape_BWP {
         std::cout<<"p Step = "<<step<<std::endl;
     }
 
-    delete[] accum;
-    delete[] rec;
-    delete[] ndon;
-    delete[] stack;
-    delete[] donor;
-
     Tmr_Overall.stop();
 
     std::cout<<"t Step1: Initialize         = "<<std::setw(15)<<Tmr_Step1_Initialize.elapsed()         <<" microseconds"<<std::endl;                 
@@ -355,6 +349,12 @@ class FastScape_BWP {
     std::cout<<"t Step6: Uplift             = "<<std::setw(15)<<Tmr_Step6_Uplift.elapsed()             <<" microseconds"<<std::endl;             
     std::cout<<"t Step7: Erosion            = "<<std::setw(15)<<Tmr_Step7_Erosion.elapsed()            <<" microseconds"<<std::endl;              
     std::cout<<"t Overall                   = "<<std::setw(15)<<Tmr_Overall.elapsed()                  <<" microseconds"<<std::endl;        
+
+    delete[] accum;
+    delete[] rec;
+    delete[] ndon;
+    delete[] stack;
+    delete[] donor;
   }
 
 

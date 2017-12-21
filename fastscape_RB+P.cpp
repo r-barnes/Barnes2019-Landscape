@@ -272,13 +272,12 @@ class FastScape_RBP {
 
 
   void Erode(){
-    //#pragma omp parallel default(none)
     for(int li=0;li<nlevel-1;li++){
       const int lvlstart = levels[li];
       const int lvlend   = levels[li+1];
       const int lvlsize  = lvlend-lvlstart;
-      #pragma omp parallel for if(lvlstart>2000)
-      for(int si=levels[li];si<levels[li+1];si++){
+      #pragma omp parallel for if(lvlsize>500)
+      for(int si=lvlstart;si<lvlend;si++){
         const int c = stack[si];          //Cell from which flow originates
         if(rec[c]==NO_FLOW)
           continue;
@@ -311,8 +310,8 @@ class FastScape_RBP {
     accum  = new double[size];
     rec    = new int[size];
     ndon   = new int[size];
-    stack  = new int[size];
     donor  = new int[8*size];
+    stack  = new int[size];
 
     //It's difficult to know how much memory should be allocated for levels. For
     //a square DEM with isotropic dispersion this is approximately sqrt(E/2). A
@@ -340,13 +339,6 @@ class FastScape_RBP {
         std::cout<<"p Step = "<<step<<std::endl;
     }
 
-    delete[] accum;
-    delete[] rec;
-    delete[] ndon;
-    delete[] stack;
-    delete[] donor;
-    delete[] levels;
-
     Tmr_Overall.stop();
 
     std::cout<<"t Step1: Initialize         = "<<std::setw(15)<<Tmr_Step1_Initialize.elapsed()         <<" microseconds"<<std::endl;                 
@@ -357,6 +349,13 @@ class FastScape_RBP {
     std::cout<<"t Step6: Uplift             = "<<std::setw(15)<<Tmr_Step6_Uplift.elapsed()             <<" microseconds"<<std::endl;             
     std::cout<<"t Step7: Erosion            = "<<std::setw(15)<<Tmr_Step7_Erosion.elapsed()            <<" microseconds"<<std::endl;              
     std::cout<<"t Overall                   = "<<std::setw(15)<<Tmr_Overall.elapsed()                  <<" microseconds"<<std::endl;        
+
+    delete[] accum;
+    delete[] rec;
+    delete[] ndon;
+    delete[] stack;
+    delete[] donor;
+    delete[] levels;
   }
 
       // std::cerr<<"Levels: ";
