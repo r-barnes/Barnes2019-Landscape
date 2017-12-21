@@ -357,6 +357,7 @@ class FastScape_RBPQ {
 
     //#pragma omp parallel default(none)
     for(int li=0;li<tnlevel-1;li++){
+      #pragma omp simd
       for(int si=tlevels[li];si<tlevels[li+1];si++){
         const int c = tstack[si];          //Cell from which flow originates
         if(rec[c]==NO_FLOW)

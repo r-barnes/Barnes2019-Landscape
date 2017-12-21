@@ -365,13 +365,14 @@ class FastScape_BWP {
 int main(int argc, char **argv){
   //feenableexcept(FE_ALL_EXCEPT);
 
-  if(argc!=3){
-    std::cerr<<"Syntax: "<<argv[0]<<" <Dimension> <Steps>"<<std::endl;
+  if(argc!=4){
+    std::cerr<<"Syntax: "<<argv[0]<<" <Dimension> <Steps> <Output Name>"<<std::endl;
     return -1;
   }
 
   std::cout<<"A FastScape B&W+P"<<std::endl;
   std::cout<<"C Richard Barnes TODO"<<std::endl;
+  std::cout<<"h "<<GIT_HASH<<std::endl;
 
   const int width  = std::stoi(argv[1]);
   const int height = std::stoi(argv[1]);
@@ -382,7 +383,7 @@ int main(int argc, char **argv){
   tm.run(nstep);
   std::cout<<"t Total calculation time    = "<<std::setw(15)<<tmr.elapsed()<<" microseconds"<<std::endl;
 
-  PrintDEM("out_BW+P.dem", tm.getH(), width, height);
+  PrintDEM(argv[3], tm.getH(), width, height);
 
   return 0;
 }
