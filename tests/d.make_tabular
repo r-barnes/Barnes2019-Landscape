@@ -36,6 +36,6 @@ def main():
       col        = col.replace(':','').replace(' ','_')
       datum[col] = val
 
-  print(tabulate(data, headers="keys", tablefmt='plain'))
+  print(tabulate(data, headers="keys", tablefmt='presto')) #plain
 
 main()
