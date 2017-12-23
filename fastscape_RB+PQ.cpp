@@ -71,10 +71,6 @@ class FastScape_RBPQ {
   int    *rec;      //Index of receiving cell
   int    *donor;    //Indices of a cell's donor cells
   int    *ndon;     //How many donors a cell has
-  int    *stack;    //Indices of cells in the order they should be processed
-
-  int    t_stack_width; //Number of stack entries available to each thread
-  int    t_level_width; //Number of level entries available to each thread
 
   //nshift offsets:
   //1 2 3
@@ -82,9 +78,6 @@ class FastScape_RBPQ {
   //7 6 5
   int    nshift[8]; //Offset from a focal cell's index to its neighbours
 
-  int    *levels;   //Indices of locations in stack where a level begins and ends
-  int    *nlevel;    //Number of levels used
-  
   CumulativeTimer Tmr_Step1_Initialize;
   CumulativeTimer Tmr_Step2_DetermineReceivers;
   CumulativeTimer Tmr_Step3_DetermineDonors;
@@ -121,9 +114,6 @@ class FastScape_RBPQ {
     size   = width*height;
 
     h      = new double[size];
-
-    t_stack_width = std::max(100,2*size/omp_get_max_threads()); //TODO: Explain
-    t_level_width = std::max(100,size/omp_get_max_threads());   //TODO: Explain, make smaller
 
     GenerateRandomTerrain();
 
@@ -246,37 +236,38 @@ class FastScape_RBPQ {
     }
   }
 
-  void GenerateOrder(){
-    const int tnum = omp_get_thread_num();
-    auto tstack    = &stack[tnum*t_stack_width];
-    auto tlevels   = &levels[tnum*t_level_width];
-    int &tnlevel   = nlevel[tnum];
-
+  void GenerateOrder(
+    int *const stack,
+    const int stack_width,
+    int *const levels,
+    const int level_width,
+    int &nlevel
+  ){
     //TODO: These loops are just a safety feature
-    for(int i=0;i<t_stack_width;i++)
-      tstack[i]  = -1;
-    for(int i=0;i<t_level_width;i++)
-      tlevels[i] = -1;
+    // for(int i=0;i<t_stack_width;i++)
+    //   stack[i]  = -1;
+    // for(int i=0;i<t_level_width;i++)
+    //   levels[i] = -1;
 
-    int tnstack = 0; //Thread local
-    tlevels[0]  = 0;
-    tnlevel     = 1;
+    int nstack = 0; //Thread local
+    levels[0]  = 0;
+    nlevel     = 1;
 
     //Outer edge
     #pragma omp for schedule(static) nowait
     for(int y=1;y<height-1;y++){
-      tstack[tnstack++] = y*width+1;          assert(tnstack<t_stack_width);
-      tstack[tnstack++] = y*width+(width-2);  assert(tnstack<t_stack_width);
+      stack[nstack++] = y*width+1;          assert(nstack<stack_width);
+      stack[nstack++] = y*width+(width-2);  assert(nstack<stack_width);
     }
 
     #pragma omp for schedule(static) nowait
     for(int x=1;x<width-1;x++){
-      tstack[tnstack++] =          1*width+x; assert(tnstack<t_stack_width);
-      tstack[tnstack++] = (height-2)*width+x; assert(tnstack<t_stack_width);
+      stack[nstack++] =          1*width+x; assert(nstack<stack_width);
+      stack[nstack++] = (height-2)*width+x; assert(nstack<stack_width);
     }
 
     //End of outer edge
-    tlevels[tnlevel++] = tnstack; //Last cell of this level
+    levels[nlevel++] = nstack; //Last cell of this level
 
     //Interior cells
     //TODO: Outside edge is always NO_FLOW. Maybe this can get loaded once?
@@ -287,50 +278,48 @@ class FastScape_RBPQ {
     for(int x=2;x<width -2;x++){
       const int c = y*width+x;
       if(rec[c]==NO_FLOW){
-        tstack[tnstack++] = c;                assert(tnstack<t_stack_width);
+        stack[nstack++] = c;                assert(nstack<stack_width);
       }
     }
     //Last cell of this level
-    tlevels[tnlevel++] = tnstack;             assert(tnlevel<t_level_width); 
+    levels[nlevel++] = nstack;              assert(nlevel<level_width); 
 
     int level_bottom = -1;
     int level_top    = 0;
 
     while(level_bottom<level_top){
       level_bottom = level_top;
-      level_top    = tnstack;
+      level_top    = nstack;
       for(int si=level_bottom;si<level_top;si++){
-        const auto c = tstack[si];
+        const auto c = stack[si];
         for(int k=0;k<ndon[c];k++){
           const auto n    = donor[8*c+k];
-          tstack[tnstack++] = n;                assert(tnstack<t_stack_width);
+          stack[nstack++] = n;               assert(nstack<stack_width);
         }
       }
 
-      tlevels[tnlevel++] = tnstack;
+      levels[nlevel++] = nstack;
     }
 
     //End condition for the loop places two identical entries
     //at the end of the stack. Remove one.
-    tnlevel--;
+    nlevel--;
   }
 
 
-  void ComputeFlowAcc(){
-    //! computing drainage area
-    const int tnum = omp_get_thread_num();
-    auto tstack    = &stack[tnum*t_stack_width];
-    auto tlevels   = &levels[tnum*t_level_width];
-    int &tnlevel   = nlevel[tnum];
-
-    for(int i=tlevels[0];i<tlevels[tnlevel-1];i++){
-      const int c = tstack[i];
+  void ComputeFlowAcc(
+    const int *const stack,
+    const int *const levels,
+    const int &nlevel
+  ){
+    for(int i=levels[0];i<levels[nlevel-1];i++){
+      const int c = stack[i];
       accum[c] = cell_area;
     }
 
-    for(int li=tnlevel-2;li>=0;li--){
-      for(int si=tlevels[li];si<tlevels[li+1];si++){
-        const int c = tstack[si];
+    for(int li=nlevel-2;li>=0;li--){
+      for(int si=levels[li];si<levels[li+1];si++){
+        const int c = stack[si];
 
         if(rec[c]!=NO_FLOW){
           const int n = c+nshift[rec[c]];
@@ -341,31 +330,29 @@ class FastScape_RBPQ {
   }
 
 
-  void AddUplift(){
-    const int tnum = omp_get_thread_num();
-    auto tstack    = &stack[tnum*t_stack_width];
-    auto tlevels   = &levels[tnum*t_level_width];
-    int &tnlevel   = nlevel[tnum];
-
-    //Start at tlevels[1] so we don't elevate the outer edge
-    for(int i=tlevels[1];i<tlevels[tnlevel-1];i++){
-      const int c = tstack[i];
+  void AddUplift(
+    const int *const stack,
+    const int *const levels,
+    const int &nlevel
+  ){
+    //Start at levels[1] so we don't elevate the outer edge
+    for(int i=levels[1];i<levels[nlevel-1];i++){
+      const int c = stack[i];
       h[c]       += ueq*dt; 
     }
   }
 
 
-  void Erode(){
-    const int tnum = omp_get_thread_num();
-    auto tstack    = &stack[tnum*t_stack_width];
-    auto tlevels   = &levels[tnum*t_level_width];
-    int &tnlevel   = nlevel[tnum];
-
+  void Erode(
+    const int *const stack,
+    const int *const levels,
+    const int nlevel
+  ){
     //#pragma omp parallel default(none)
-    for(int li=0;li<tnlevel-1;li++){
+    for(int li=0;li<nlevel-1;li++){
       #pragma omp simd
-      for(int si=tlevels[li];si<tlevels[li+1];si++){
-        const int c = tstack[si];          //Cell from which flow originates
+      for(int si=levels[li];si<levels[li+1];si++){
+        const int c = stack[si];          //Cell from which flow originates
         if(rec[c]==NO_FLOW)
           continue;
         const int n = c+nshift[rec[c]];    //Cell receiving the flow
@@ -398,44 +385,50 @@ class FastScape_RBPQ {
     rec    = new int[size];
     ndon   = new int[size];
     donor  = new int[8*size];
-    stack  = new int[omp_get_max_threads()*t_stack_width]; //TODO: Explain
-    nlevel = new int[omp_get_max_threads()];
 
-    //It's difficult to know how much memory should be allocated for levels. For
-    //a square DEM with isotropic dispersion this is approximately sqrt(E/2). A
-    //diagonally tilted surface with isotropic dispersion may have sqrt(E)
-    //levels. A tortorously sinuous river may have up to E*E levels. We
-    //compromise and choose a number of levels equal to the perimiter because
-    //why not?
-    levels = new int[omp_get_max_threads()*t_level_width]; //TODO: Make smaller to `2*width+2*height`
+    //TODO: Make smaller, explain max
+    const int t_stack_width = std::max(100,2*size/omp_get_max_threads()); //Number of stack entries available to each thread
+    const int t_level_width = std::max(100,size/omp_get_max_threads());   //Number of level entries available to each thread
 
     //! initializing rec
-    #pragma omp parallel
-    {
-      #pragma omp for
-      for(int i=0;i<size;i++)
-        rec[i] = NO_FLOW;
+    #pragma omp parallel for
+    for(int i=0;i<size;i++)
+      rec[i] = NO_FLOW;
 
-      #pragma omp for
-      for(int i=0;i<size;i++)
-        ndon[i] = 0;
-    }
-
+    #pragma omp parallel for
+    for(int i=0;i<size;i++)
+      ndon[i] = 0;
 
     Tmr_Step1_Initialize.stop();
 
     #pragma omp parallel
-    for(int step=0;step<=nstep;step++){
-      Tmr_Step2_DetermineReceivers.start ();   ComputeReceivers  (); Tmr_Step2_DetermineReceivers.stop ();
-      Tmr_Step3_DetermineDonors.start    ();   ComputeDonors     (); Tmr_Step3_DetermineDonors.stop    ();
-      Tmr_Step4_GenerateOrder.start      ();   GenerateOrder     (); Tmr_Step4_GenerateOrder.stop      ();
-      Tmr_Step5_FlowAcc.start            ();   ComputeFlowAcc    (); Tmr_Step5_FlowAcc.stop            ();
-      Tmr_Step6_Uplift.start             ();   AddUplift         (); Tmr_Step6_Uplift.stop             ();
-      Tmr_Step7_Erosion.start            ();   Erode             (); Tmr_Step7_Erosion.stop            ();
+    {
+      int *stack  = new int[t_stack_width]; //Indices of cells in the order they should be processed
 
-      #pragma omp master
-      if( step%20==0 )
-        std::cout<<"p Step = "<<step<<std::endl;
+      //It's difficult to know how much memory should be allocated for levels. For
+      //a square DEM with isotropic dispersion this is approximately sqrt(E/2). A
+      //diagonally tilted surface with isotropic dispersion may have sqrt(E)
+      //levels. A tortorously sinuous river may have up to E*E levels. We
+      //compromise and choose a number of levels equal to the perimiter because
+      //why not?
+      int *levels = new int[t_level_width]; //TODO
+      int  nlevel = 0;
+
+      for(int step=0;step<=nstep;step++){
+        Tmr_Step2_DetermineReceivers.start ();   ComputeReceivers  ();                    Tmr_Step2_DetermineReceivers.stop ();
+        Tmr_Step3_DetermineDonors.start    ();   ComputeDonors     ();                    Tmr_Step3_DetermineDonors.stop    ();
+        Tmr_Step4_GenerateOrder.start      ();   GenerateOrder     (stack,t_stack_width,levels,t_level_width,nlevel); Tmr_Step4_GenerateOrder.stop      ();
+        Tmr_Step5_FlowAcc.start            ();   ComputeFlowAcc    (stack,levels,nlevel); Tmr_Step5_FlowAcc.stop            ();
+        Tmr_Step6_Uplift.start             ();   AddUplift         (stack,levels,nlevel); Tmr_Step6_Uplift.stop             ();
+        Tmr_Step7_Erosion.start            ();   Erode             (stack,levels,nlevel); Tmr_Step7_Erosion.stop            ();
+
+        #pragma omp master
+        if( step%20==0 )
+          std::cout<<"p Step = "<<step<<std::endl;
+      }
+
+      delete[] stack;
+      delete[] levels;
     }
 
     Tmr_Overall.stop();
@@ -452,10 +445,7 @@ class FastScape_RBPQ {
     delete[] accum;
     delete[] rec;
     delete[] ndon;
-    delete[] stack;
     delete[] donor;
-    delete[] levels;
-    delete[] nlevel;    
   }
 
       // std::cerr<<"Levels: ";
