@@ -245,6 +245,7 @@ class FastScape_RBPF {
 
     int level_bottom = 0;
     int level_top    = 0;
+
     while(nstack<size){
       level_bottom = level_top;
       level_top    = nstack;
