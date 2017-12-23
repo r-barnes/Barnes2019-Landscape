@@ -16,6 +16,8 @@
   #define omp_get_max_threads() 1
 #endif
 
+
+
 void PrintDEM(
   const std::string filename, 
   const double *const h,
@@ -290,23 +292,26 @@ class FastScape_RBPQ {
     //Last cell of this level
     tlevels[tnlevel++] = tnstack;             assert(tnlevel<t_level_width); 
 
-    int qpoint = 0;
+    int level_bottom = -1;
+    int level_top    = 0;
 
-    while(qpoint<tnstack){
-      const auto c = tstack[qpoint];
-      for(int k=0;k<ndon[c];k++){
-        const auto n    = donor[8*c+k];
-        tstack[tnstack++] = n;                assert(tnstack<t_stack_width);
+    while(level_bottom<level_top){
+      level_bottom = level_top;
+      level_top    = tnstack;
+      for(int si=level_bottom;si<level_top;si++){
+        const auto c = tstack[si];
+        for(int k=0;k<ndon[c];k++){
+          const auto n    = donor[8*c+k];
+          tstack[tnstack++] = n;                assert(tnstack<t_stack_width);
+        }
       }
 
-      //TODO: What's this about, then?
-      qpoint++;
-      if(qpoint==tlevels[tnlevel-1] && tnstack!=tlevels[tnlevel-1]){
-        //Starting a new level      
-        tlevels[tnlevel++] = tnstack;         assert(tnlevel<t_level_width); 
-      }
+      tlevels[tnlevel++] = tnstack;
     }
-    // std::cerr<<"tnstack final = "<<tnstack<<std::endl;
+
+    //End condition for the loop places two identical entries
+    //at the end of the stack. Remove one.
+    tnlevel--;
   }
 
 

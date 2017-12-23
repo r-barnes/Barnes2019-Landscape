@@ -73,7 +73,6 @@ class FastScape_RB {
 
   int    *levels;   //Indices of locations in stack where a level begins and ends
   int    nlevel;    //Number of levels used
-  int    nstack;    //Number of levels used in the stack
   
   CumulativeTimer Tmr_Step1_Initialize;
   CumulativeTimer Tmr_Step2_DetermineReceivers;
@@ -218,9 +217,7 @@ class FastScape_RB {
   }
 
   void GenerateOrder(){
-    int qpoint = 0;
-
-    nstack = 0;
+    int nstack = 0;    //Number of levels used in the stack
 
     levels[0] = 0;
     nlevel    = 1;
@@ -233,19 +230,23 @@ class FastScape_RB {
     }
     levels[nlevel++] = nstack; //Last cell of this level
 
-    while(qpoint<nstack){
-      const auto c = stack[qpoint];
-      for(int k=0;k<ndon[c];k++){
-        const auto n    = donor[8*c+k];
-        stack[nstack++] = n;
+    int level_bottom = 0;
+    int level_top    = 0;
+    while(nstack<size){
+      level_bottom = level_top;
+      level_top    = nstack;
+      for(int si=level_bottom;si<level_top;si++){
+        const auto c = stack[si];
+        for(int k=0;k<ndon[c];k++){
+          const auto n = donor[8*c+k];
+          stack[nstack++] = n;
+        }
       }
 
-      //TODO: What's this about, then?
-      qpoint++;
-      if(qpoint==levels[nlevel-1] && nstack!=levels[nlevel-1])
-        levels[nlevel++] = nstack; //Starting a new level      
+      levels[nlevel++] = nstack; //Starting a new level      
     }
-    // std::cerr<<"nstack final = "<<nstack<<std::endl;
+
+    assert(levels[nlevel-1]==nstack);
   }
 
 
@@ -254,7 +255,7 @@ class FastScape_RB {
     for(int i=0;i<size;i++)
       accum[i] = cell_area;
 
-    for(int s=nstack-1;s>=0;s--){
+    for(int s=size-1;s>=0;s--){
       const int c = stack[s];
       if(rec[c]!=NO_FLOW){
         const int n = c+nshift[rec[c]];
