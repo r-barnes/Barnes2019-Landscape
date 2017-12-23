@@ -243,7 +243,7 @@ class FastScape_RBGPU {
   }
 
   void GenerateOrder(){
-    int nstack = 0;
+    int nstack = 0;    //Number of levels used in the stack
 
     levels[0] = 0;
     nlevel    = 1;
