@@ -31,9 +31,27 @@ if [ ! -f z_serial_comparison.dat ]; then
     echo "m Rep   = $rep"
     echo "H host  = $host"
 
-    echo "R $exe_prefix$prog $size $steps out_${prog}_${size}_${steps}_${rep}.dem"
-    eval "$exe_prefix$prog $size $steps out_${prog}_${size}_${steps}_${rep}.dem"
+    echo "R $exe_prefix$prog $size $steps out_${prog}_${size}_${steps}_${rep}.dem 123"
+    eval "$exe_prefix$prog $size $steps out_${prog}_${size}_${steps}_${rep}.dem 123"
   done
   done
   done > >(tee -i z_serial_comparison.dat)
+
+  sizes=( 100 500 1000 ) 
+  reps=( 100 50 20 )
+  for prog in "${progs[@]}"; do
+  for (( s=0;   s<${#sizes[@]}; s++ )); do
+  for (( rep=0; rep<${reps[s]}; rep++ )); do
+    size=${sizes[s]}
+    echo "# Prog  = $prog"
+    echo "m Size  = $size"
+    echo "m Steps = $steps"
+    echo "m Rep   = $rep"
+    echo "H host  = $host"
+
+    echo "R $exe_prefix$prog $size $steps out_${prog}_${size}_${steps}_${rep}.dem 0"
+    eval "$exe_prefix$prog $size $steps out_${prog}_${size}_${steps}_${rep}.dem 0"
+  done
+  done
+  done > >(tee -a -i z_serial_comparison.dat) 
 fi
