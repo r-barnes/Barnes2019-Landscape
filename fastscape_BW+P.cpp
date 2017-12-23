@@ -5,10 +5,11 @@
 #include <cstdlib>
 #include <fenv.h> //Used to catch floating point NaN issues
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <limits>
+#include "random.hpp"
 #include <vector>
-#include <iomanip>
 #include "CumulativeTimer.hpp"
 
 
@@ -372,14 +373,17 @@ class FastScape_BWP {
 int main(int argc, char **argv){
   //feenableexcept(FE_ALL_EXCEPT);
 
-  if(argc!=4){
-    std::cerr<<"Syntax: "<<argv[0]<<" <Dimension> <Steps> <Output Name>"<<std::endl;
+  if(argc!=5){
+    std::cerr<<"Syntax: "<<argv[0]<<" <Dimension> <Steps> <Output Name> <Seed>"<<std::endl;
     return -1;
   }
 
+  seed_rand(std::stoi(argv[4]));
+
   std::cout<<"A FastScape B&W+P"<<std::endl;
   std::cout<<"C Richard Barnes TODO"<<std::endl;
-  std::cout<<"h "<<GIT_HASH<<std::endl;
+  std::cout<<"h git_hash    = "<<GIT_HASH<<std::endl;
+  std::cout<<"m Random seed = "<<argv[4]<<std::endl;
 
   const int width  = std::stoi(argv[1]);
   const int height = std::stoi(argv[1]);

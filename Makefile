@@ -9,19 +9,19 @@ WARNINGS = -Wall -Wpedantic -pedantic -Wall -Wextra -Wcast-align -Wcast-qual -Wc
 all: fastscape_BW.exe fastscape_BW+P.exe fastscape_RB.exe fastscape_RB+P.exe fastscape_RB+PQ.exe
 
 fastscape_BW.exe: fastscape_BW.cpp  
-	$(CXX) $(CFLAGS) $(WARNINGS) -o fastscape_BW.exe    CumulativeTimer.cpp   fastscape_BW.cpp        -Wno-unknown-pragmas   
+	$(CXX) $(CFLAGS) $(WARNINGS) -o fastscape_BW.exe    CumulativeTimer.cpp  random.cpp  fastscape_BW.cpp        -Wno-unknown-pragmas   
 
 fastscape_BW+P.exe: fastscape_BW+P.cpp
-	$(CXX) $(CFLAGS) $(WARNINGS) -o fastscape_BW+P.exe  CumulativeTimer.cpp   fastscape_BW+P.cpp      -fopenmp
+	$(CXX) $(CFLAGS) $(WARNINGS) -o fastscape_BW+P.exe  CumulativeTimer.cpp  random.cpp  fastscape_BW+P.cpp      -fopenmp
 
 fastscape_RB.exe: fastscape_RB.cpp  
-	$(CXX) $(CFLAGS) $(WARNINGS) -o fastscape_RB.exe    CumulativeTimer.cpp   fastscape_RB.cpp        -Wno-unknown-pragmas   
+	$(CXX) $(CFLAGS) $(WARNINGS) -o fastscape_RB.exe    CumulativeTimer.cpp  random.cpp  fastscape_RB.cpp        -Wno-unknown-pragmas   
 
 fastscape_RB+P.exe: fastscape_RB+P.cpp  
-	$(CXX) $(CFLAGS) $(WARNINGS) -o fastscape_RB+P.exe  CumulativeTimer.cpp   fastscape_RB+P.cpp      -fopenmp
+	$(CXX) $(CFLAGS) $(WARNINGS) -o fastscape_RB+P.exe  CumulativeTimer.cpp  random.cpp  fastscape_RB+P.cpp      -fopenmp
 
 fastscape_RB+PQ.exe: fastscape_RB+PQ.cpp	
-	$(CXX) $(CFLAGS) $(WARNINGS) -o fastscape_RB+PQ.exe CumulativeTimer.cpp   fastscape_RB+PQ.cpp     -fopenmp
+	$(CXX) $(CFLAGS) $(WARNINGS) -o fastscape_RB+PQ.exe CumulativeTimer.cpp  random.cpp  fastscape_RB+PQ.cpp     -fopenmp
 
 clean:
 	rm -rf *.exe
