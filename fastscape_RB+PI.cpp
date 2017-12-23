@@ -229,8 +229,7 @@ class FastScape_RBPF {
   }
 
   void GenerateOrder(){
-    int nstack = 0;
-    int qpoint = 0;
+    int nstack = 0;    //Number of levels used in the stack
 
     levels[0] = 0;
     nlevel    = 1;
@@ -243,19 +242,23 @@ class FastScape_RBPF {
     }
     levels[nlevel++] = nstack; //Last cell of this level
 
-    while(qpoint<nstack){
-      const auto c = stack[qpoint];
-      for(int k=0;k<ndon[c];k++){
-        const auto n    = donor[8*c+k];
-        stack[nstack++] = n;
+    int level_bottom = 0;
+    int level_top    = 0;
+    while(nstack<size){
+      level_bottom = level_top;
+      level_top    = nstack;
+      for(int si=level_bottom;si<level_top;si++){
+        const auto c = stack[si];
+        for(int k=0;k<ndon[c];k++){
+          const auto n = donor[8*c+k];
+          stack[nstack++] = n;
+        }
       }
 
-      //TODO: What's this about, then?
-      qpoint++;
-      if(qpoint==levels[nlevel-1] && nstack!=levels[nlevel-1])
-        levels[nlevel++] = nstack; //Starting a new level      
+      levels[nlevel++] = nstack; //Starting a new level      
     }
-    // std::cerr<<"nstack final = "<<nstack<<std::endl;
+
+    assert(levels[nlevel-1]==nstack);
   }
 
 

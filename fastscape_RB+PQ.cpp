@@ -16,6 +16,8 @@
   #define omp_get_max_threads() 1
 #endif
 
+
+
 void PrintDEM(
   const std::string filename, 
   const double *const h,
