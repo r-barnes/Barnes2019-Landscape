@@ -243,13 +243,8 @@ class FastScape_RBPQ {
     const int level_width,
     int &nlevel
   ){
-    //TODO: These loops are just a safety feature
-    // for(int i=0;i<t_stack_width;i++)
-    //   stack[i]  = -1;
-    // for(int i=0;i<t_level_width;i++)
-    //   levels[i] = -1;
+    int nstack = 0;
 
-    int nstack = 0; //Thread local
     levels[0]  = 0;
     nlevel     = 1;
 
@@ -278,11 +273,13 @@ class FastScape_RBPQ {
     for(int x=2;x<width -2;x++){
       const int c = y*width+x;
       if(rec[c]==NO_FLOW){
-        stack[nstack++] = c;                assert(nstack<stack_width);
+        stack[nstack++] = c;                
+        assert(nstack<stack_width);
       }
     }
     //Last cell of this level
-    levels[nlevel++] = nstack;              assert(nlevel<level_width); 
+    levels[nlevel++] = nstack;              
+    assert(nlevel<level_width); 
 
     int level_bottom = -1;
     int level_top    = 0;
@@ -294,11 +291,12 @@ class FastScape_RBPQ {
         const auto c = stack[si];
         for(int k=0;k<ndon[c];k++){
           const auto n    = donor[8*c+k];
-          stack[nstack++] = n;               assert(nstack<stack_width);
+          stack[nstack++] = n;              
+          assert(nstack<stack_width);
         }
       }
 
-      levels[nlevel++] = nstack;
+      levels[nlevel++] = nstack; //Starting a new level      
     }
 
     //End condition for the loop places two identical entries

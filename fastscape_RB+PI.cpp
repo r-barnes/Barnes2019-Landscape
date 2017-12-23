@@ -230,23 +230,27 @@ class FastScape_RBPF {
   }
 
   void GenerateOrder(){
-    int nstack = 0;    //Number of levels used in the stack
+    int nstack = 0;
 
     levels[0] = 0;
     nlevel    = 1;
 
     //TODO: Outside edge is always NO_FLOW. Maybe this can get loaded once?
     //Load cells without dependencies into the queue
-    for(int c=0;c<size;c++){
-      if(rec[c]==NO_FLOW)
+    for(int y=2;y<height-2;y++)
+    for(int x=2;x<width -2;x++){
+      const int c = y*width+x;
+      if(rec[c]==NO_FLOW){
         stack[nstack++] = c;
+      }
     }
-    levels[nlevel++] = nstack; //Last cell of this level
+    //Last cell of this level
+    levels[nlevel++] = nstack; 
 
-    int level_bottom = 0;
+    int level_bottom = -1;
     int level_top    = 0;
 
-    while(nstack<size){
+    while(level_bottom<level_top){
       level_bottom = level_top;
       level_top    = nstack;
       for(int si=level_bottom;si<level_top;si++){
@@ -259,6 +263,10 @@ class FastScape_RBPF {
 
       levels[nlevel++] = nstack; //Starting a new level      
     }
+
+    //End condition for the loop places two identical entries
+    //at the end of the stack. Remove one.
+    nlevel--;
 
     assert(levels[nlevel-1]==nstack);
   }
