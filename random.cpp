@@ -27,7 +27,7 @@ void seed_rand(unsigned long seed){
       std::seed_seq q(std::begin(seed_data), std::end(seed_data));
       rand_engine().seed(q);
     } else
-      rand_engine().seed( seed*omp_get_thread_num() );
+      rand_engine().seed( seed*static_cast<unsigned int>(omp_get_thread_num()) );
   }
 }
 

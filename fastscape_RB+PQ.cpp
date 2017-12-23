@@ -320,7 +320,6 @@ class FastScape_RBPQ {
     for(int li=nlevel-2;li>=0;li--){
       for(int si=levels[li];si<levels[li+1];si++){
         const int c = stack[si];
-
         if(rec[c]!=NO_FLOW){
           const int n = c+nshift[rec[c]];
           accum[n]   += accum[c];
@@ -472,7 +471,7 @@ int main(int argc, char **argv){
     return -1;
   }
 
-  seed_rand(std::stoi(argv[4]));
+  seed_rand(std::stoul(argv[4]));
 
   std::cout<<"A FastScape RB+PQ"<<std::endl;
   std::cout<<"C Richard Barnes TODO"<<std::endl;

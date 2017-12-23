@@ -354,7 +354,7 @@ int main(int argc, char **argv){
     return -1;
   }
 
-  seed_rand(std::stoi(argv[4]));
+  seed_rand(std::stoul(argv[4]));
 
   std::cout<<"A FastScape B&W"<<std::endl;
   std::cout<<"C Richard Barnes TODO"<<std::endl;

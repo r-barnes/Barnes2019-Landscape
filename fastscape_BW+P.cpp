@@ -283,7 +283,7 @@ class FastScape_BWP {
 
   void Erode(){
     #pragma omp parallel for schedule(dynamic)
-    for(int ss=0;ss<stack_start.size()-1;ss++){
+    for(unsigned int ss=0;ss<stack_start.size()-1;ss++){
       const int sstart = stack_start.at(ss);
       const int send   = stack_start.at(ss+1);
       for(int s=sstart;s<send;s++){
@@ -378,7 +378,7 @@ int main(int argc, char **argv){
     return -1;
   }
 
-  seed_rand(std::stoi(argv[4]));
+  seed_rand(std::stoul(argv[4]));
 
   std::cout<<"A FastScape B&W+P"<<std::endl;
   std::cout<<"C Richard Barnes TODO"<<std::endl;

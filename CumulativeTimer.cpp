@@ -21,7 +21,7 @@ void CumulativeTimer::stop(){
       throw std::runtime_error("Can't stop a Timer that hasn't been started!");
 
     running          = false;
-    cumulative_time += std::chrono::duration_cast<std::chrono::microseconds> (clock::now() - start_time).count();
+    cumulative_time += static_cast<unsigned long int>(std::chrono::duration_cast<std::chrono::microseconds> (clock::now() - start_time).count());
   }
 }
 
@@ -31,7 +31,7 @@ void CumulativeTimer::reset(){
 
 uint64_t CumulativeTimer::elapsed() const { 
   if(running)
-    return cumulative_time + std::chrono::duration_cast<std::chrono::microseconds> (clock::now() - start_time).count(); 
+    return cumulative_time + static_cast<unsigned long int>(std::chrono::duration_cast<std::chrono::microseconds> (clock::now() - start_time).count()); 
   else
     return cumulative_time;
 }
