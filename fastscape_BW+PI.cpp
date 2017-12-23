@@ -5,10 +5,10 @@
 #include <cstdlib>
 #include <fenv.h> //Used to catch floating point NaN issues
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <limits>
 #include <vector>
-#include <iomanip>
 #include "CumulativeTimer.hpp"
 
 
