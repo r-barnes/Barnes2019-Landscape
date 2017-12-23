@@ -30,11 +30,18 @@ def main():
 
     if tag=='A':
       datum['Algorithm'] = col.replace(' ','_')
-    elif tag in ['p', 'C']:
+    elif tag=='h':
+      datum['hash'] = col
+    elif tag in ['p', 'C', 'R', '#']:
       pass
-    else:
+    elif tag in ['t', 'H', 'm']:
       col        = col.replace(':','').replace(' ','_')
-      datum[col] = val
+      datum[col] = val      
+    else:
+      print("Unrecognised tag '{0}' in '{1}'".format(tag,line))
+    # else:
+    #   col        = col.replace(':','').replace(' ','_')
+    #   datum[col] = val
 
   print(tabulate(data, headers="keys", tablefmt='presto')) #plain
 
