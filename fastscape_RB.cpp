@@ -276,9 +276,8 @@ class FastScape_RB {
 
 
   void Erode(){
-    for(int li=0;li<nlevel-1;li++){
-      for(int si=levels[li];si<levels[li+1];si++){
-        const int c = stack[si]; //Cell from which flow originates
+    for(int s=0;s<size;s++){
+      const int c = stack[s];           //Cell from which flow originates
         if(rec[c]==NO_FLOW)
           continue;
         const int n = c+nshift[rec[c]];   //Cell receiving the flow
@@ -296,7 +295,6 @@ class FastScape_RB {
           hp    = hnew;
         }
         h[c] = hnew;
-      }
     }
   }
 
