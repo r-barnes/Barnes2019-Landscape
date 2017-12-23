@@ -5,11 +5,11 @@
 #include <cstdlib>
 #include <fenv.h> //Used to catch floating point NaN issues
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <limits>
 #include "random.hpp"
 #include <vector>
-#include <iomanip>
 #include "CumulativeTimer.hpp"
 
 
@@ -38,8 +38,6 @@ void PrintDEM(
 
 class FastScape_BW {
  private:
-  static constexpr double DINFTY  = std::numeric_limits<double>::infinity();
-
   const int    NO_FLOW = -1;
   const double SQRT2   = 1.414213562373095048801688724209698078569671875376948;
 
