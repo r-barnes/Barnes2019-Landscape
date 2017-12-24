@@ -24,7 +24,7 @@ fastscape_RB+PQ.exe: fastscape_RB+PQ.cpp
 	$(CXX) $(CFLAGS) $(WARNINGS) -o fastscape_RB+PQ.exe CumulativeTimer.cpp  random.cpp  fastscape_RB+PQ.cpp     -fopenmp
 
 fastscape_RB+GPU.exe: fastscape_RB+GPU.cpp	
-	$(CXX) $(CFLAGS) $(WARNINGS) -o fastscape_RB+GPU.exe CumulativeTimer.cpp  random.cpp  fastscape_RB+GPU.cpp     -fopenmp
+	$(CXX) $(CFLAGS) $(WARNINGS) -o fastscape_RB+GPU.exe CumulativeTimer.cpp  random.cpp  fastscape_RB+GPU.cpp  
 
 clean:
 	rm -rf *.exe
