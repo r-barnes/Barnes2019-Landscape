@@ -246,44 +246,44 @@ class FastScape_RBGPU {
     levels[0] = 0;
     nlevel    = 1;
 
+    #pragma acc update host(donor[0:8*size], ndon[0:size], rec[0:size])
+
     //TODO: Outside edge is always NO_FLOW. Maybe this can get loaded once?
     //Load cells without dependencies into the queue
-    #pragma acc parallel loop present(this,rec,stack)
-    for(int c=0;c<size;c++){
+    for(int y=2;y<height-2;y++)
+    for(int x=2;x<width -2;x++){
+      const int c = y*width+x;
       if(rec[c]==NO_FLOW){
-        int mystack;
-        #pragma acc atomic capture
-        mystack = nstack++;
-        stack[mystack] = c;
+        stack[nstack++] = c;
       }
     }
-    levels[nlevel++] = nstack; //Last cell of this level
+    //Last cell of this level
+    levels[nlevel++] = nstack; 
 
-    int level_bottom = 0;
+    int level_bottom = -1;
     int level_top    = 0;
 
-    //#pragma acc loop seq
-    while(nstack<size){
-      std::cerr<<nstack<<" - "<<size<<std::endl;
+    while(level_bottom<level_top){
       level_bottom = level_top;
       level_top    = nstack;
-      #pragma acc parallel loop independent copy(nstack) present(this,stack,donor,levels)
-      for(int qpoint=level_bottom;qpoint<level_top;qpoint++){
-        const auto c = stack[qpoint];
-        #pragma acc loop seq
+      for(int si=level_bottom;si<level_top;si++){
+        const auto c = stack[si];
         for(int k=0;k<ndon[c];k++){
           const auto n    = donor[8*c+k];
-          int mystack;
-          #pragma acc atomic capture
-          mystack = nstack++;
-          stack[mystack] = n;
+          stack[nstack++] = n;
         }
       }
 
-      //TODO: What's this about, then?
-      if(nstack!=levels[nlevel-1])
         levels[nlevel++] = nstack; //Starting a new level      
     }
+
+    //End condition for the loop places two identical entries
+    //at the end of the stack. Remove one.
+    nlevel--;
+
+    #pragma acc update device(stack[0:size],levels[0:size],nlevel)
+
+    assert(levels[nlevel-1]==nstack);
   }
 
 
@@ -309,8 +309,9 @@ class FastScape_RBGPU {
 
   void AddUplift(){
     //! adding uplift to landscape
-    #pragma acc parallel loop collapse(2) present(this,h)
+    #pragma acc parallel loop present(this,h)
     for(int y=2;y<height-2;y++)
+    #pragma acc loop independent
     for(int x=2;x<width-2;x++){
       const int c = y*width+x;
       h[c]       += ueq*dt; 
@@ -319,11 +320,11 @@ class FastScape_RBGPU {
 
 
   void Erode(){
-    #pragma acc parallel loop seq present(this,levels,stack,nshift,rec,accum,h)
+    #pragma acc parallel present(this,levels,stack,nshift,rec,accum,h)
     for(int li=0;li<nlevel-1;li++){
       const int lvlstart = levels[li];
       const int lvlend   = levels[li+1];
-      #pragma acc loop 
+      #pragma acc loop independent
       for(int si=lvlstart;si<lvlend;si++){
         const int c = stack[si];          //Cell from which flow originates
         if(rec[c]==NO_FLOW)
@@ -372,11 +373,11 @@ class FastScape_RBGPU {
     #pragma acc enter data copyin(this[0:1],h[0:size],nshift[0:8]) create(accum[0:size],rec[0:size],ndon[0:size],donor[0:8*size],stack[0:size],levels[0:size])
 
     //! initializing rec
-    #pragma acc parallel loop present(rec)
+    #pragma acc parallel loop present(this,rec)
     for(int i=0;i<size;i++)
       rec[i] = NO_FLOW;
 
-    #pragma acc parallel loop present(ndon)
+    #pragma acc parallel loop present(this,ndon)
     for(int i=0;i<size;i++)
       ndon[i] = 0;
 
@@ -388,7 +389,7 @@ class FastScape_RBGPU {
     for(int step=0;step<=nstep;step++){
       ComputeReceivers  ();
       ComputeDonors     ();
-      GenerateOrder     ();
+      Tmr_Step4_GenerateOrder.start(); GenerateOrder     (); Tmr_Step4_GenerateOrder.stop();
       ComputeFlowAcc    ();
       AddUplift         ();
       Erode             ();
@@ -397,6 +398,7 @@ class FastScape_RBGPU {
     Tmr_Overall.stop();
 
     std::cout<<"t Step1: Initialize         = "<<std::setw(15)<<Tmr_Step1_Initialize.elapsed()         <<" microseconds"<<std::endl;                 
+    std::cout<<"t Step4: GenerateOrder         = "<<std::setw(15)<<Tmr_Step4_GenerateOrder.elapsed()         <<" microseconds"<<std::endl;                 
     std::cout<<"t Overall                   = "<<std::setw(15)<<Tmr_Overall.elapsed()                  <<" microseconds"<<std::endl;        
 
     #pragma acc exit data copyout(h[0:size]) delete(this,accum,rec,ndon,donor,stack,nlevel,levels)
