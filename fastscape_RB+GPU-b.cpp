@@ -195,7 +195,7 @@ class FastScape_RBGPU {
     //const int t_stack_width = std::max(100,2*size/omp_get_max_threads()); //Number of stack entries available to each thread
     //const int t_level_width = std::max(100,size/omp_get_max_threads());   //Number of level entries available to each thread
 
-    const int t_stack_width = 10000;
+    const int t_stack_width = 100000;
     const int t_level_width = 1000;
 
     //#pragma acc parallel gang worker

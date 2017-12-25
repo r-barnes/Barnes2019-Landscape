@@ -209,8 +209,6 @@ class FastScape_RBGPU {
       }
       rec[c] = max_n;
     }    }
-
-    #pragma acc update host(rec[0:size])
   }
 
 
