@@ -302,6 +302,8 @@ class FastScape_RBGPU {
       //GENERATE ORDER
       /////////////////////////////
       {
+        Tmr_Step4_GenerateOrder.start();
+
         int nstack = 0;    //Number of levels used in the stack
 
         levels[0] = 0;
@@ -345,6 +347,8 @@ class FastScape_RBGPU {
         #pragma acc update device(stack[0:size],levels[0:size],nlevel)
 
         assert(levels[nlevel-1]==nstack);    
+
+        Tmr_Step4_GenerateOrder.stop();
       }
 
 
@@ -420,6 +424,7 @@ class FastScape_RBGPU {
     Tmr_Overall.stop();
 
     std::cout<<"t Step1: Initialize         = "<<std::setw(15)<<Tmr_Step1_Initialize.elapsed()         <<" microseconds"<<std::endl;                 
+    std::cout<<"t Step4: Generate order     = "<<std::setw(15)<<Tmr_Step4_GenerateOrder.elapsed()         <<" microseconds"<<std::endl;                 
     std::cout<<"t Overall                   = "<<std::setw(15)<<Tmr_Overall.elapsed()                  <<" microseconds"<<std::endl;        
 
     #pragma acc exit data copyout(h[0:size]) delete(this,accum[0:size],rec[0:size],ndon[0:size],donor[0:8*size])
