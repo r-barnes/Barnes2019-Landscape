@@ -11,3 +11,4 @@ scorep*
 refs/
 paper/
 *.log
+*.o
