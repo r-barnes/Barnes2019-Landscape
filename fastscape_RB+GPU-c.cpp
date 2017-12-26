@@ -266,7 +266,7 @@ class FastScape_RBGPU {
       //guaranteed to have sole write-access to its location in the donor array.
 
       {
-        #pragma acc parallel loop default(none) collapse(2) independent present(this,ndon,donor,rec) //async(1)
+        #pragma acc parallel loop default(none) collapse(2) independent present(this,ndon,donor,rec) async(1)
         for(int y=1;y<height-1;y++)
         for(int x=1;x<width-1;x++){
           const int c = y*width+x;
@@ -289,7 +289,7 @@ class FastScape_RBGPU {
       /////////////////////////////
       {
         //! adding uplift to landscape
-        #pragma acc parallel loop collapse(2) independent present(this,h[0:size]) //async(2)
+        #pragma acc parallel loop collapse(2) independent present(this,h[0:size]) async(2)
         for(int y=2;y<height-2;y++)
         for(int x=2;x<width-2;x++){
           const int c = y*width+x;
@@ -309,7 +309,7 @@ class FastScape_RBGPU {
         levels[0] = 0;
         nlevel    = 1;
 
-        #pragma acc update host(donor[0:8*size], ndon[0:size], rec[0:size])
+        #pragma acc update host(donor[0:8*size], ndon[0:size], rec[0:size]) wait(1)
 
         //TODO: Outside edge is always NO_FLOW. Maybe this can get loaded once?
         //Load cells without dependencies into the queue
@@ -357,9 +357,11 @@ class FastScape_RBGPU {
       //FLOW ACCUMULATION
       /////////////////////////////
       {
-        #pragma acc parallel loop present(this,accum)
+        #pragma acc parallel loop present(this,accum) async(3)
         for(int i=0;i<size;i++)
           accum[i] = cell_area;
+
+        #pragma acc wait
 
         #pragma acc loop seq
         for(int li=nlevel-2;li>=0;li--){

@@ -303,7 +303,7 @@ class FastScape_RBGPU {
       }
 
 
-      #pragma acc parallel default(none) present(this[0:1],h[0:size],nshift[0:8],size,accum[0:size],rec[0:size],ndon[0:size],donor[0:8*size]) private(levels[0:t_level_width],stack[0:t_stack_width],nstack) async(3)
+      #pragma acc parallel default(none) num_gangs(100) present(this[0:1],h[0:size],nshift[0:8],size,accum[0:size],rec[0:size],ndon[0:size],donor[0:8*size]) private(levels[0:t_level_width],stack[0:t_stack_width],nstack) async(3)
       {
 
       /////////////////////////////
@@ -320,11 +320,15 @@ class FastScape_RBGPU {
           stack[nstack++] = y*width+(width-2);  //assert(nstack<stack_width);
         }
 
+        #pragma acc wait
+
         #pragma acc loop
         for(int x=1;x<width-1;x++){
           stack[nstack++] =          1*width+x; //assert(nstack<stack_width);
           stack[nstack++] = (height-2)*width+x; //assert(nstack<stack_width);
         }
+
+        #pragma acc wait
 
         //End of outer edge
         levels[nlevel++] = nstack; //Last cell of this level
@@ -345,7 +349,7 @@ class FastScape_RBGPU {
 //        levels[nlevel++] = nstack;              
     //    assert(nlevel<level_width); 
 
-        #pragma wait (1)
+        #pragma wait 
 
         int level_bottom = -1;
         int level_top    = 0;
@@ -373,7 +377,7 @@ class FastScape_RBGPU {
         nlevel--;        
       }
 
-
+      #pragma acc wait
 
       /////////////////////////////
       //FLOW ACCUMULATION
