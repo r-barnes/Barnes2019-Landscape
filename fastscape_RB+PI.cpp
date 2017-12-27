@@ -66,6 +66,9 @@ class FastScape_RBPF {
   int    *ndon;     //How many donors a cell has
   int    *stack;    //Indices of cells in the order they should be processed
 
+  int stack_width;  //Number of cells allowed in the stack
+  int level_width;  //Number of cells allowed in a level
+
   //nshift offsets:
   //1 2 3
   //0   4
@@ -242,11 +245,12 @@ class FastScape_RBPF {
       const int c = y*width+x;
       if(rec[c]==NO_FLOW){
         stack[nstack++] = c;
-        assert(nstack<size);
+        assert(nstack<stack_width);
       }
     }
     //Last cell of this level
     levels[nlevel++] = nstack; 
+    assert(nlevel<level_width); 
 
     int level_bottom = -1;
     int level_top    = 0;
@@ -259,6 +263,7 @@ class FastScape_RBPF {
         for(int k=0;k<ndon[c];k++){
           const auto n = donor[8*c+k];
           stack[nstack++] = n;
+          assert(nstack<stack_width);
         }
       }
 
@@ -356,10 +361,10 @@ class FastScape_RBPF {
       ndon[i] = 0;
 
     //TODO: Make smaller, explain max
-    const int t_stack_width = std::max(100,2*size/omp_get_max_threads()); //Number of stack entries available to each thread
-    const int t_level_width = std::max(100,size/omp_get_max_threads());   //Number of level entries available to each thread
+    int t_stack_width = size; //Number of stack entries available to each thread
+    int t_level_width = size; //Number of level entries available to each thread
 
-    stack  = new int[t_stack_width];
+    stack  = new int[stack_width];
 
     //It's difficult to know how much memory should be allocated for levels. For
     //a square DEM with isotropic dispersion this is approximately sqrt(E/2). A
@@ -367,7 +372,7 @@ class FastScape_RBPF {
     //levels. A tortorously sinuous river may have up to E*E levels. We
     //compromise and choose a number of levels equal to the perimiter because
     //why not?
-    levels = new int[t_level_width]; //TODO: Make smaller to `2*width+2*height`
+    levels = new int[level_width]; //TODO: Make smaller to `2*width+2*height`
 
     Tmr_Step1_Initialize.stop();
 
