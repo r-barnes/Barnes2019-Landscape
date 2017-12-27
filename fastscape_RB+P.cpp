@@ -323,10 +323,6 @@ class FastScape_RBP {
     ndon   = new int[size];
     donor  = new int[8*size];
 
-    //TODO: Make smaller, explain max
-    const int t_stack_width = std::max(100,2*size/omp_get_max_threads()); //Number of stack entries available to each thread
-    const int t_level_width = std::max(100,size/omp_get_max_threads());   //Number of level entries available to each thread
-
     //! initializing rec
     #pragma omp parallel for
     for(int i=0;i<size;i++)
@@ -336,7 +332,11 @@ class FastScape_RBP {
     for(int i=0;i<size;i++)
       ndon[i] = 0;
 
-    stack  = new int[size];
+    //TODO: Make smaller, explain max
+    const int t_stack_width = std::max(100,2*size/omp_get_max_threads()); //Number of stack entries available to each thread
+    const int t_level_width = std::max(100,size/omp_get_max_threads());   //Number of level entries available to each thread
+
+    stack  = new int[t_stack_width];
 
     //It's difficult to know how much memory should be allocated for levels. For
     //a square DEM with isotropic dispersion this is approximately sqrt(E/2). A
