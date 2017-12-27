@@ -316,7 +316,9 @@ class FastScape_RBPQ {
     }
 
     for(int li=nlevel-2;li>=0;li--){
-      for(int si=levels[li];si<levels[li+1];si++){
+      const int lvlstart = levels[li];
+      const int lvlend   = levels[li+1];
+      for(int si=lvlstart;si<lvlend;si++){
         const int c = stack[si];
         if(rec[c]!=NO_FLOW){
           const int n = c+nshift[rec[c]];
@@ -347,8 +349,10 @@ class FastScape_RBPQ {
   ){
     //#pragma omp parallel default(none)
     for(int li=0;li<nlevel-1;li++){
+      const int lvlstart = levels[li];
+      const int lvlend   = levels[li+1];
       #pragma omp simd
-      for(int si=levels[li];si<levels[li+1];si++){
+      for(int si=lvlstart;si<lvlend;si++){
         const int c = stack[si];          //Cell from which flow originates
         if(rec[c]==NO_FLOW)
           continue;
