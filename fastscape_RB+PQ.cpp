@@ -72,6 +72,9 @@ class FastScape_RBPQ {
   int    *donor;    //Indices of a cell's donor cells
   int    *ndon;     //How many donors a cell has
 
+  int stack_width;  //Number of cells allowed in the stack
+  int level_width;  //Number of cells allowed in a level
+
   //nshift offsets:
   //1 2 3
   //0   4
@@ -238,9 +241,7 @@ class FastScape_RBPQ {
 
   void GenerateOrder(
     int *const stack,
-    const int stack_width,
     int *const levels,
-    const int level_width,
     int &nlevel
   ){
     int nstack = 0;
@@ -387,10 +388,6 @@ class FastScape_RBPQ {
     ndon   = new int[size];
     donor  = new int[8*size];
 
-    //TODO: Make smaller, explain max
-    const int t_stack_width = std::max(100,2*size/omp_get_max_threads()); //Number of stack entries available to each thread
-    const int t_level_width = std::max(100,size/omp_get_max_threads());   //Number of level entries available to each thread
-
     //! initializing rec
     #pragma omp parallel for
     for(int i=0;i<size;i++)
@@ -400,11 +397,13 @@ class FastScape_RBPQ {
     for(int i=0;i<size;i++)
       ndon[i] = 0;
 
-    Tmr_Step1_Initialize.stop();
+    //TODO: Make smaller, explain max
+    stack_width = std::max(100,2*size/omp_get_max_threads()); //Number of stack entries available to each thread
+    level_width = std::max(100,size/omp_get_max_threads());   //Number of level entries available to each thread
 
     #pragma omp parallel
     {
-      int *stack  = new int[t_stack_width]; //Indices of cells in the order they should be processed
+      int *stack  = new int[stack_width]; //Indices of cells in the order they should be processed
 
       //It's difficult to know how much memory should be allocated for levels. For
       //a square DEM with isotropic dispersion this is approximately sqrt(E/2). A
@@ -412,16 +411,18 @@ class FastScape_RBPQ {
       //levels. A tortorously sinuous river may have up to E*E levels. We
       //compromise and choose a number of levels equal to the perimiter because
       //why not?
-      int *levels = new int[t_level_width]; //TODO
+      int *levels = new int[level_width]; //TODO
       int  nlevel = 0;
 
+      Tmr_Step1_Initialize.stop();
+
       for(int step=0;step<=nstep;step++){
-        Tmr_Step2_DetermineReceivers.start ();   ComputeReceivers  ();                                                Tmr_Step2_DetermineReceivers.stop ();
-        Tmr_Step3_DetermineDonors.start    ();   ComputeDonors     ();                                                Tmr_Step3_DetermineDonors.stop    ();
-        Tmr_Step4_GenerateOrder.start      ();   GenerateOrder     (stack,t_stack_width,levels,t_level_width,nlevel); Tmr_Step4_GenerateOrder.stop      ();
-        Tmr_Step5_FlowAcc.start            ();   ComputeFlowAcc    (stack,levels,nlevel);                             Tmr_Step5_FlowAcc.stop            ();
-        Tmr_Step6_Uplift.start             ();   AddUplift         (stack,levels,nlevel);                             Tmr_Step6_Uplift.stop             ();
-        Tmr_Step7_Erosion.start            ();   Erode             (stack,levels,nlevel);                             Tmr_Step7_Erosion.stop            ();
+        Tmr_Step2_DetermineReceivers.start ();   ComputeReceivers  ();                      Tmr_Step2_DetermineReceivers.stop ();
+        Tmr_Step3_DetermineDonors.start    ();   ComputeDonors     ();                      Tmr_Step3_DetermineDonors.stop    ();
+        Tmr_Step4_GenerateOrder.start      ();   GenerateOrder     (stack,levels,nlevel);   Tmr_Step4_GenerateOrder.stop      ();
+        Tmr_Step5_FlowAcc.start            ();   ComputeFlowAcc    (stack,levels,nlevel);   Tmr_Step5_FlowAcc.stop            ();
+        Tmr_Step6_Uplift.start             ();   AddUplift         (stack,levels,nlevel);   Tmr_Step6_Uplift.stop             ();
+        Tmr_Step7_Erosion.start            ();   Erode             (stack,levels,nlevel);   Tmr_Step7_Erosion.stop            ();
 
         #pragma omp master
         if( step%20==0 )
