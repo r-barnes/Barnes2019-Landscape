@@ -218,7 +218,7 @@ class FastScape_RBP {
   }
 
   void GenerateOrder(){
-    int nstack = 0;    //Number of levels used in the stack
+    int nstack = 0;
 
     levels[0] = 0;
     nlevel    = 1;
@@ -229,11 +229,13 @@ class FastScape_RBP {
       if(rec[c]==NO_FLOW)
         stack[nstack++] = c;
     }
-    levels[nlevel++] = nstack; //Last cell of this level
+    //Last cell of this level
+    levels[nlevel++] = nstack;
 
-    int level_bottom = 0;
+    int level_bottom = -1;
     int level_top    = 0;
-    while(nstack<size){
+
+    while(level_bottom<level_top){
       level_bottom = level_top;
       level_top    = nstack;
       for(int si=level_bottom;si<level_top;si++){
@@ -246,6 +248,10 @@ class FastScape_RBP {
 
       levels[nlevel++] = nstack; //Starting a new level      
     }
+
+    //End condition for the loop places two identical entries
+    //at the end of the stack. Remove one.
+    nlevel--;
 
     assert(levels[nlevel-1]==nstack);
   }
@@ -316,6 +322,20 @@ class FastScape_RBP {
     rec    = new int[size];
     ndon   = new int[size];
     donor  = new int[8*size];
+
+    //TODO: Make smaller, explain max
+    const int t_stack_width = std::max(100,2*size/omp_get_max_threads()); //Number of stack entries available to each thread
+    const int t_level_width = std::max(100,size/omp_get_max_threads());   //Number of level entries available to each thread
+
+    //! initializing rec
+    #pragma omp parallel for
+    for(int i=0;i<size;i++)
+      rec[i] = NO_FLOW;
+
+    #pragma omp parallel for
+    for(int i=0;i<size;i++)
+      ndon[i] = 0;
+
     stack  = new int[size];
 
     //It's difficult to know how much memory should be allocated for levels. For
@@ -324,11 +344,7 @@ class FastScape_RBP {
     //levels. A tortorously sinuous river may have up to E*E levels. We
     //compromise and choose a number of levels equal to the perimiter because
     //why not?
-    levels = new int[size]; //TODO: Make smaller to `2*width+2*height`
-
-    //! initializing rec
-    for(int i=0;i<size;i++)
-      rec[i] = NO_FLOW;
+    levels = new int[t_level_width]; //TODO: Make smaller to `2*width+2*height`
 
     Tmr_Step1_Initialize.stop();
 
