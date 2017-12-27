@@ -263,7 +263,7 @@ class FastScape_RBPF {
         for(int k=0;k<ndon[c];k++){
           const auto n = donor[8*c+k];
           stack[nstack++] = n;
-          assert(nstack<stack_width);
+          assert(nstack<=stack_width);
         }
       }
 
@@ -279,7 +279,6 @@ class FastScape_RBPF {
 
 
   void ComputeFlowAcc(){
-    //! computing drainage area
     for(int i=0;i<size;i++)
       accum[i] = cell_area;
 
@@ -300,7 +299,6 @@ class FastScape_RBPF {
 
 
   void AddUplift(){
-    //! adding uplift to landscape
     #pragma omp parallel for collapse(2)
     for(int y=2;y<height-2;y++)
     for(int x=2;x<width-2;x++){
@@ -361,8 +359,8 @@ class FastScape_RBPF {
       ndon[i] = 0;
 
     //TODO: Make smaller, explain max
-    int t_stack_width = size; //Number of stack entries available to each thread
-    int t_level_width = size; //Number of level entries available to each thread
+    stack_width = size; //Number of stack entries available to each thread
+    level_width = size; //Number of level entries available to each thread
 
     stack  = new int[stack_width];
 

@@ -293,7 +293,7 @@ class FastScape_RBPQ {
         for(int k=0;k<ndon[c];k++){
           const auto n    = donor[8*c+k];
           stack[nstack++] = n;              
-          assert(nstack<stack_width);
+          assert(nstack<=stack_width);
         }
       }
 

@@ -249,7 +249,7 @@ class FastScape_RBP {
         for(int k=0;k<ndon[c];k++){
           const auto n = donor[8*c+k];
           stack[nstack++] = n;
-          assert(nstack<stack_width);
+          assert(nstack<=stack_width);
         }
       }
 
@@ -340,8 +340,8 @@ class FastScape_RBP {
       ndon[i] = 0;
 
     //TODO: Make smaller, explain max
-    int t_stack_width = size; //Number of stack entries available to each thread
-    int t_level_width = size; //Number of level entries available to each thread
+    stack_width = size; //Number of stack entries available to each thread
+    level_width = size; //Number of level entries available to each thread
 
     stack  = new int[stack_width];
 
