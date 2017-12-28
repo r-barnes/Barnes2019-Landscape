@@ -6,16 +6,9 @@
 #include <iomanip>
 #include <iostream>
 #include <limits>
-#include <omp.h>
 #include "random.hpp"
 #include <vector>
 #include "CumulativeTimer.hpp"
-
-#ifndef _OPENMP
-  #define omp_get_thread_num()  0
-  #define omp_get_num_threads() 1
-  #define omp_get_max_threads() 1
-#endif
 
 
 
@@ -72,6 +65,9 @@ class FastScape_RBGPU {
   int    *donor;    //Indices of a cell's donor cells
   int    *ndon;     //How many donors a cell has
   int    *stack;    //Indices of cells in the order they should be processed
+
+  int stack_width;  //Number of cells allowed in the stack
+  int level_width;  //Number of cells allowed in a level
 
   //nshift offsets:
   //1 2 3
@@ -187,10 +183,13 @@ class FastScape_RBGPU {
 
  private:
   void ComputeReceivers(){
-    //! computing receiver array
-    #pragma acc parallel loop independent gang collapse(2) present(this,h,rec,width,height,dr,nshift)
-    for(int y=2;y<height-2;y++){
-      #pragma acc loop independent
+    const int height = this->height;
+    const int width  = this->width;
+
+    #pragma acc update device(h[0:size])
+
+    #pragma acc parallel loop independent collapse(2) present(this,nshift[0:8],h[0:size],rec[0:size]) //default(none) present(this,h,rec,dr,nshift)
+    for(int y=2;y<height-2;y++)
     for(int x=2;x<width-2;x++){
       const int c      = y*width+x;
 
@@ -208,11 +207,15 @@ class FastScape_RBGPU {
         }
       }
       rec[c] = max_n;
-    }    }
+    }
+
+    #pragma acc update host(rec[0:size])
   }
 
 
   void ComputeDonors(){
+    const int height = this->height;
+    const int width  = this->width;
     //The B&W method of developing the donor array has each focal cell F inform
     //its receiving cell R that F is a donor of R. Unfortunately, parallelizing
     //this is difficult because more than one cell might be informing R at any
@@ -223,9 +226,10 @@ class FastScape_RBGPU {
     //neighbours to see if it receives from them. Each focal cell is then
     //guaranteed to have sole write-access to its location in the donor array.
 
-    #pragma acc parallel loop collapse(2) present(this,rec,width,height,nshift,donor,ndon)
+    #pragma acc update device(rec[0:size])
+
+    #pragma acc parallel loop independent collapse(2) default(none) present(this,rec,nshift,donor,ndon)
     for(int y=1;y<height-1;y++)
-    #pragma acc loop independent
     for(int x=1;x<width-1;x++){
       const int c = y*width+x;
       ndon[c] = 0;
@@ -238,27 +242,31 @@ class FastScape_RBGPU {
         }
       }
     }
+
+    #pragma acc update host(donor[0:8*size],ndon[0:size])
   }
 
   void GenerateOrder(){
-    int nstack = 0;    //Number of levels used in the stack
+    int nstack = 0;
 
     levels[0] = 0;
     nlevel    = 1;
 
-    #pragma acc update host(donor[0:8*size], ndon[0:size], rec[0:size])
+    //#pragma acc update host(donor[0:8*size], ndon[0:size], rec[0:size])
 
     //TODO: Outside edge is always NO_FLOW. Maybe this can get loaded once?
     //Load cells without dependencies into the queue
-    for(int y=2;y<height-2;y++)
-    for(int x=2;x<width -2;x++){
+    for(int y=1;y<height-1;y++)
+    for(int x=1;x<width -1;x++){
       const int c = y*width+x;
       if(rec[c]==NO_FLOW){
         stack[nstack++] = c;
+        assert(nstack<stack_width);
       }
     }
     //Last cell of this level
     levels[nlevel++] = nstack; 
+    assert(nlevel<level_width); 
 
     int level_bottom = -1;
     int level_top    = 0;
@@ -271,6 +279,7 @@ class FastScape_RBGPU {
         for(int k=0;k<ndon[c];k++){
           const auto n    = donor[8*c+k];
           stack[nstack++] = n;
+          assert(nstack<=stack_width);
         }
       }
 
@@ -281,22 +290,25 @@ class FastScape_RBGPU {
     //at the end of the stack. Remove one.
     nlevel--;
 
-    #pragma acc update device(stack[0:size],levels[0:size],nlevel)
+    //#pragma acc update device(stack[0:size],levels[0:size],nlevel)
 
     assert(levels[nlevel-1]==nstack);
   }
 
 
   void ComputeFlowAcc(){
-    //! computing drainage area
-    #pragma acc parallel loop present(this,accum)
+    #pragma acc parallel loop default(none) present(this,accum)
     for(int i=0;i<size;i++)
       accum[i] = cell_area;
 
-    #pragma acc parallel loop seq present(this,accum,levels,nshift,rec)
-    for(int li=nlevel-2;li>=0;li--){
-      #pragma acc loop 
-      for(int si=levels[li];si<levels[li+1];si++){
+    #pragma acc update device(levels[0:size],nlevel,stack[0:size])
+
+    #pragma acc parallel loop seq default(none) present(this,accum,levels,nshift,rec,stack)
+    for(int li=nlevel-2;li>=1;li--){
+      const int lvlstart = levels[li];
+      const int lvlend   = levels[li+1];
+      //#pragma acc loop 
+      for(int si=lvlstart;si<lvlend;si++){
         const int c = stack[si];
         if(rec[c]!=NO_FLOW){
           const int n = c+nshift[rec[c]];
@@ -304,14 +316,17 @@ class FastScape_RBGPU {
         }
       }
     }    
+
+    #pragma acc update host(accum[0:size])
   }
 
 
   void AddUplift(){
-    //! adding uplift to landscape
-    #pragma acc parallel loop present(this,h)
+    const int height = this->height;
+    const int width  = this->width;
+
+    //#pragma acc parallel loop collapse(2) independent default(none) present(this,h)
     for(int y=2;y<height-2;y++)
-    #pragma acc loop independent
     for(int x=2;x<width-2;x++){
       const int c = y*width+x;
       h[c]       += ueq*dt; 
@@ -320,11 +335,11 @@ class FastScape_RBGPU {
 
 
   void Erode(){
-    #pragma acc parallel present(this,levels,stack,nshift,rec,accum,h)
+    //#pragma acc parallel default(none) present(this,levels,stack,nshift,rec,accum,h)
     for(int li=0;li<nlevel-1;li++){
       const int lvlstart = levels[li];
       const int lvlend   = levels[li+1];
-      #pragma acc loop independent
+      //#pragma acc loop independent
       for(int si=lvlstart;si<lvlend;si++){
         const int c = stack[si];          //Cell from which flow originates
         if(rec[c]==NO_FLOW)
@@ -338,7 +353,7 @@ class FastScape_RBGPU {
         double hnew         = h0;          //Current updated value of focal cell
         double hp           = h0;          //Previous updated value of focal cell
         double diff         = 2*tol;       //Difference between current and previous updated values
-        #pragma acc loop seq
+        //#pragma acc loop seq
         while(std::abs(diff)>tol){
           hnew -= (hnew-h0+fact*std::pow(hnew-hn,neq))/(1.+fact*neq*std::pow(hnew-hn,neq-1));
           diff  = hnew - hp;
@@ -360,7 +375,24 @@ class FastScape_RBGPU {
     rec    = new int[size];
     ndon   = new int[size];
     donor  = new int[8*size];
-    stack  = new int[size];
+
+
+    //! initializing rec
+    //#pragma acc parallel loop present(this,rec)
+    for(int i=0;i<size;i++)
+      rec[i] = NO_FLOW;
+
+    //#pragma acc parallel loop present(this,ndon)
+    for(int i=0;i<size;i++)
+      ndon[i] = 0;
+
+    #pragma acc enter data copyin(this[0:1],h[0:size],nshift[0:8],rec[0:size],ndon[0:size]) create(accum[0:size],donor[0:8*size])
+
+    //TODO: Make smaller, explain max
+    stack_width = size; //Number of stack entries available to each thread
+    level_width = size; //Number of level entries available to each thread
+
+    stack  = new int[stack_width];
 
     //It's difficult to know how much memory should be allocated for levels. For
     //a square DEM with isotropic dispersion this is approximately sqrt(E/2). A
@@ -368,19 +400,9 @@ class FastScape_RBGPU {
     //levels. A tortorously sinuous river may have up to E*E levels. We
     //compromise and choose a number of levels equal to the perimiter because
     //why not?
-    levels = new int[size]; //TODO: Make smaller to `2*width+2*height`
+    levels = new int[level_width]; //TODO: Make smaller to `2*width+2*height`
 
-    #pragma acc enter data copyin(this[0:1],h[0:size],nshift[0:8]) create(accum[0:size],rec[0:size],ndon[0:size],donor[0:8*size],stack[0:size],levels[0:size])
-
-    //! initializing rec
-    #pragma acc parallel loop present(this,rec)
-    for(int i=0;i<size;i++)
-      rec[i] = NO_FLOW;
-
-    #pragma acc parallel loop present(this,ndon)
-    for(int i=0;i<size;i++)
-      ndon[i] = 0;
-
+    #pragma acc enter data create(stack[0:stack_width],levels[0:level_width])
 
     Tmr_Step1_Initialize.stop();
 
@@ -398,10 +420,10 @@ class FastScape_RBGPU {
     Tmr_Overall.stop();
 
     std::cout<<"t Step1: Initialize         = "<<std::setw(15)<<Tmr_Step1_Initialize.elapsed()         <<" microseconds"<<std::endl;                 
-    std::cout<<"t Step4: GenerateOrder         = "<<std::setw(15)<<Tmr_Step4_GenerateOrder.elapsed()         <<" microseconds"<<std::endl;                 
+    std::cout<<"t Step4: GenerateOrder      = "<<std::setw(15)<<Tmr_Step4_GenerateOrder.elapsed()      <<" microseconds"<<std::endl;                 
     std::cout<<"t Overall                   = "<<std::setw(15)<<Tmr_Overall.elapsed()                  <<" microseconds"<<std::endl;        
 
-    #pragma acc exit data copyout(h[0:size]) delete(this,accum,rec,ndon,donor,stack,nlevel,levels)
+    #pragma acc exit data copyout(h[0:size]) delete(this,accum[0:size],rec[0:size],ndon[0:size],donor[0:8*size],stack[0:stack_width],nlevel,levels[0:level_width])
 
     delete[] accum;
     delete[] rec;
@@ -435,7 +457,7 @@ int main(int argc, char **argv){
     return -1;
   }
 
-  seed_rand(std::stoi(argv[4]));
+  seed_rand(std::stoul(argv[4]));
 
   std::cout<<"A FastScape RB+GPU"<<std::endl;
   std::cout<<"C Richard Barnes TODO"<<std::endl;
