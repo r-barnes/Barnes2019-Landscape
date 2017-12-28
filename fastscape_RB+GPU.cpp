@@ -246,21 +246,28 @@ class FastScape_RBGPU {
     levels[0] = 0;
     nlevel    = 1;
 
-    //#pragma acc update host(donor[0:8*size], ndon[0:size], rec[0:size])
+    const int height = this->height;
+    const int width  = this->width;
 
     //TODO: Outside edge is always NO_FLOW. Maybe this can get loaded once?
     //Load cells without dependencies into the queue
+    #pragma acc parallel loop collapse(2) independent num_gangs(10) default(none) copy(nstack) present(this,rec[0:size],stack[0:stack_width])
     for(int y=1;y<height-1;y++)
     for(int x=1;x<width -1;x++){
       const int c = y*width+x;
       if(rec[c]==NO_FLOW){
-        stack[nstack++] = c;
-        assert(nstack<stack_width);
+        int mystack;
+        #pragma acc atomic capture
+        mystack = nstack++;
+        stack[mystack] = c;
+        // assert(mystack<stack_width);
       }
     }
     //Last cell of this level
     levels[nlevel++] = nstack; 
     assert(nlevel<level_width); 
+
+    #pragma acc update host(stack[0:stack_width])
 
     int level_bottom = -1;
     int level_top    = 0;
@@ -268,16 +275,20 @@ class FastScape_RBGPU {
     while(level_bottom<level_top){
       level_bottom = level_top;
       level_top    = nstack;
+      //#pragma acc parallel loop independent num_gangs(10) default(none) copy(nstack) present(this,ndon[0:size],donor[0:8*size],stack[0:stack_width])
       for(int si=level_bottom;si<level_top;si++){
         const auto c = stack[si];
         for(int k=0;k<ndon[c];k++){
           const auto n    = donor[8*c+k];
-          stack[nstack++] = n;
-          assert(nstack<=stack_width);
+          int mystack;
+          #pragma acc atomic capture
+          mystack = nstack++;
+          stack[mystack] = n;
+          // assert(nstack<=stack_width);
         }
       }
 
-        levels[nlevel++] = nstack; //Starting a new level      
+      levels[nlevel++] = nstack; //Starting a new level      
     }
 
     //End condition for the loop places two identical entries
@@ -405,18 +416,27 @@ class FastScape_RBGPU {
     //#pragma acc kernels present(accum,rec,ndon,donor,stack,nlevel,levels)
     //#pragma acc loop seq
     for(int step=0;step<=nstep;step++){
-      ComputeReceivers  ();
-      ComputeDonors     ();
-      Tmr_Step4_GenerateOrder.start(); GenerateOrder     (); Tmr_Step4_GenerateOrder.stop();
-      ComputeFlowAcc    ();
-      AddUplift         ();
-      Erode             ();
+      Tmr_Step2_DetermineReceivers.start ();   ComputeReceivers  ();  Tmr_Step2_DetermineReceivers.stop ();
+      Tmr_Step3_DetermineDonors.start    ();   ComputeDonors     ();  Tmr_Step3_DetermineDonors.stop    ();
+      Tmr_Step4_GenerateOrder.start      ();   GenerateOrder     ();  Tmr_Step4_GenerateOrder.stop      ();
+      Tmr_Step5_FlowAcc.start            ();   ComputeFlowAcc    ();  Tmr_Step5_FlowAcc.stop            ();
+      Tmr_Step6_Uplift.start             ();   AddUplift         ();  Tmr_Step6_Uplift.stop             ();
+      Tmr_Step7_Erosion.start            ();   Erode             ();  Tmr_Step7_Erosion.stop            ();
+
+      #pragma omp master
+      if( step%20==0 )
+        std::cout<<"p Step = "<<step<<std::endl;
     }
 
     Tmr_Overall.stop();
 
     std::cout<<"t Step1: Initialize         = "<<std::setw(15)<<Tmr_Step1_Initialize.elapsed()         <<" microseconds"<<std::endl;                 
+    std::cout<<"t Step2: DetermineReceivers = "<<std::setw(15)<<Tmr_Step2_DetermineReceivers.elapsed() <<" microseconds"<<std::endl;                         
+    std::cout<<"t Step3: DetermineDonors    = "<<std::setw(15)<<Tmr_Step3_DetermineDonors.elapsed()    <<" microseconds"<<std::endl;                      
     std::cout<<"t Step4: GenerateOrder      = "<<std::setw(15)<<Tmr_Step4_GenerateOrder.elapsed()      <<" microseconds"<<std::endl;                 
+    std::cout<<"t Step5: FlowAcc            = "<<std::setw(15)<<Tmr_Step5_FlowAcc.elapsed()            <<" microseconds"<<std::endl;              
+    std::cout<<"t Step6: Uplift             = "<<std::setw(15)<<Tmr_Step6_Uplift.elapsed()             <<" microseconds"<<std::endl;             
+    std::cout<<"t Step7: Erosion            = "<<std::setw(15)<<Tmr_Step7_Erosion.elapsed()            <<" microseconds"<<std::endl;              
     std::cout<<"t Overall                   = "<<std::setw(15)<<Tmr_Overall.elapsed()                  <<" microseconds"<<std::endl;        
 
     #pragma acc exit data copyout(h[0:size]) delete(this,accum[0:size],rec[0:size],ndon[0:size],donor[0:8*size],stack[0:stack_width],nlevel,levels[0:level_width])
