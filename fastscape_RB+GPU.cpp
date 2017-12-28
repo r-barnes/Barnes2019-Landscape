@@ -297,22 +297,23 @@ class FastScape_RBGPU {
 
 
   void ComputeFlowAcc(){
-    //#pragma acc parallel loop default(none) present(this,accum)
+    #pragma acc parallel loop default(none) present(this,accum)
     for(int i=0;i<size;i++)
       accum[i] = cell_area;
 
-    //#pragma acc update device(levels[0:size],nlevel,stack[0:size])
+    #pragma acc update device(levels[0:size],nlevel,stack[0:size])
 
-    //#pragma acc parallel default(none) present(this,accum,levels,nshift,rec,stack)
     //nlevel-1 to nlevel:   Doesn't exist, since nlevel is outside the bounds of level
     //nlevel-2 to nlevel-1: Uppermost heights
     //nlevel-3 to nlevel-2: Region just below the uppermost heights
+    // #pragma acc parallel default(none) present(this,accum,levels,nshift,rec,stack)
     for(int li=nlevel-3;li>=1;li--){
       const int lvlstart = levels[li];
       const int lvlend   = levels[li+1];
-      //#pragma acc loop independent
+      #pragma acc parallel loop independent default(none) present(this,accum,levels,nshift,rec,stack)
       for(int si=lvlstart;si<lvlend;si++){
         const int c = stack[si];
+        #pragma acc loop seq
         for(int k=0;k<ndon[c];k++){
           const auto n = donor[8*c+k];
           accum[c]    += accum[n];
@@ -320,7 +321,7 @@ class FastScape_RBGPU {
       }
     }    
 
-    //#pragma acc update host(accum[0:size])
+    #pragma acc update host(accum[0:size])
   }
 
 
