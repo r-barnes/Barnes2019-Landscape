@@ -186,8 +186,6 @@ class FastScape_RBGPU {
     const int height = this->height;
     const int width  = this->width;
 
-    #pragma acc update device(h[0:size])
-
     #pragma acc parallel loop independent collapse(2) present(this,nshift[0:8],h[0:size],rec[0:size]) //default(none) present(this,h,rec,dr,nshift)
     for(int y=2;y<height-2;y++)
     for(int x=2;x<width-2;x++){
@@ -208,8 +206,6 @@ class FastScape_RBGPU {
       }
       rec[c] = max_n;
     }
-
-    #pragma acc update host(rec[0:size])
   }
 
 
@@ -226,8 +222,6 @@ class FastScape_RBGPU {
     //neighbours to see if it receives from them. Each focal cell is then
     //guaranteed to have sole write-access to its location in the donor array.
 
-    #pragma acc update device(rec[0:size])
-
     #pragma acc parallel loop independent collapse(2) default(none) present(this,rec,nshift,donor,ndon)
     for(int y=1;y<height-1;y++)
     for(int x=1;x<width-1;x++){
@@ -242,11 +236,11 @@ class FastScape_RBGPU {
         }
       }
     }
-
-    #pragma acc update host(donor[0:8*size],ndon[0:size])
   }
 
   void GenerateOrder(){
+    #pragma acc update host(rec[0:size],donor[0:8*size],ndon[0:size])
+
     int nstack = 0;
 
     levels[0] = 0;
@@ -293,6 +287,8 @@ class FastScape_RBGPU {
     //#pragma acc update device(stack[0:size],levels[0:size],nlevel)
 
     assert(levels[nlevel-1]==nstack);
+
+    #pragma acc update device(stack[0:size],levels[0:size],nlevel)
   }
 
 
@@ -300,8 +296,6 @@ class FastScape_RBGPU {
     #pragma acc parallel loop default(none) present(this,accum)
     for(int i=0;i<size;i++)
       accum[i] = cell_area;
-
-    #pragma acc update device(levels[0:size],nlevel,stack[0:size])
 
     //nlevel-1 to nlevel:   Doesn't exist, since nlevel is outside the bounds of level
     //nlevel-2 to nlevel-1: Uppermost heights
@@ -320,8 +314,6 @@ class FastScape_RBGPU {
         }
       }
     }    
-
-    #pragma acc update host(accum[0:size])
   }
 
 
@@ -329,22 +321,16 @@ class FastScape_RBGPU {
     const int height = this->height;
     const int width  = this->width;
 
-    #pragma acc update device(h[0:size])
-
     #pragma acc parallel loop collapse(2) independent default(none) present(this,h)
     for(int y=2;y<height-2;y++)
     for(int x=2;x<width-2;x++){
       const int c = y*width+x;
       h[c]       += ueq*dt; 
     }
-
-    #pragma acc update host(h[0:size])
   }
 
 
   void Erode(){
-    #pragma acc update device(h[0:size],levels[0:level_width],stack[0:stack_width],nlevel,rec[0:size],accum[0:size])
-
     // #pragma acc parallel default(none) present(this,levels,stack,nshift,rec,accum,h)
     for(int li=0;li<nlevel-1;li++){
       const int lvlstart = levels[li];
@@ -372,8 +358,6 @@ class FastScape_RBGPU {
         h[c] = hnew;
       }
     }
-
-    #pragma acc update host(h[0:size])
   }
 
 
