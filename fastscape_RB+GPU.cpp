@@ -297,13 +297,13 @@ class FastScape_RBGPU {
 
 
   void ComputeFlowAcc(){
-    #pragma acc parallel loop default(none) present(this,accum)
+    //#pragma acc parallel loop default(none) present(this,accum)
     for(int i=0;i<size;i++)
       accum[i] = cell_area;
 
-    #pragma acc update device(levels[0:size],nlevel,stack[0:size])
+    //#pragma acc update device(levels[0:size],nlevel,stack[0:size])
 
-    #pragma acc parallel loop seq default(none) present(this,accum,levels,nshift,rec,stack)
+    //#pragma acc parallel loop seq default(none) present(this,accum,levels,nshift,rec,stack)
     for(int li=nlevel-2;li>=1;li--){
       const int lvlstart = levels[li];
       const int lvlend   = levels[li+1];
@@ -317,7 +317,7 @@ class FastScape_RBGPU {
       }
     }    
 
-    #pragma acc update host(accum[0:size])
+    //#pragma acc update host(accum[0:size])
   }
 
 
@@ -325,21 +325,27 @@ class FastScape_RBGPU {
     const int height = this->height;
     const int width  = this->width;
 
-    //#pragma acc parallel loop collapse(2) independent default(none) present(this,h)
+    #pragma acc update device(h[0:size])
+
+    #pragma acc parallel loop collapse(2) independent default(none) present(this,h)
     for(int y=2;y<height-2;y++)
     for(int x=2;x<width-2;x++){
       const int c = y*width+x;
       h[c]       += ueq*dt; 
     }
+
+    #pragma acc update host(h[0:size])
   }
 
 
   void Erode(){
-    //#pragma acc parallel default(none) present(this,levels,stack,nshift,rec,accum,h)
+    // #pragma acc update device(h[0:size],levels[0:level_width],stack[0:stack_width],rec[0:size],accum[0:size])
+
+    // #pragma acc parallel default(none) present(this,levels,stack,nshift,rec,accum,h)
     for(int li=0;li<nlevel-1;li++){
       const int lvlstart = levels[li];
       const int lvlend   = levels[li+1];
-      //#pragma acc loop independent
+      // #pragma acc loop independent
       for(int si=lvlstart;si<lvlend;si++){
         const int c = stack[si];          //Cell from which flow originates
         if(rec[c]==NO_FLOW)
@@ -362,6 +368,8 @@ class FastScape_RBGPU {
         h[c] = hnew;
       }
     }
+
+    // #pragma acc update host(h[0:size])
   }
 
 
