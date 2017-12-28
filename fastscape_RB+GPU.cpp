@@ -303,16 +303,19 @@ class FastScape_RBGPU {
 
     //#pragma acc update device(levels[0:size],nlevel,stack[0:size])
 
-    //#pragma acc parallel loop seq default(none) present(this,accum,levels,nshift,rec,stack)
-    for(int li=nlevel-2;li>=1;li--){
+    //#pragma acc parallel default(none) present(this,accum,levels,nshift,rec,stack)
+    //nlevel-1 to nlevel:   Doesn't exist, since nlevel is outside the bounds of level
+    //nlevel-2 to nlevel-1: Uppermost heights
+    //nlevel-3 to nlevel-2: Region just below the uppermost heights
+    for(int li=nlevel-3;li>=1;li--){
       const int lvlstart = levels[li];
       const int lvlend   = levels[li+1];
-      //#pragma acc loop 
+      //#pragma acc loop independent
       for(int si=lvlstart;si<lvlend;si++){
         const int c = stack[si];
-        if(rec[c]!=NO_FLOW){
-          const int n = c+nshift[rec[c]];
-          accum[n]   += accum[c];
+        for(int k=0;k<ndon[c];k++){
+          const auto n = donor[8*c+k];
+          accum[c]    += accum[n];
         }
       }
     }    
