@@ -343,13 +343,13 @@ class FastScape_RBGPU {
 
 
   void Erode(){
-    // #pragma acc update device(h[0:size],levels[0:level_width],stack[0:stack_width],rec[0:size],accum[0:size])
+    #pragma acc update device(h[0:size],levels[0:level_width],stack[0:stack_width],nlevel,rec[0:size],accum[0:size])
 
     // #pragma acc parallel default(none) present(this,levels,stack,nshift,rec,accum,h)
     for(int li=0;li<nlevel-1;li++){
       const int lvlstart = levels[li];
       const int lvlend   = levels[li+1];
-      // #pragma acc loop independent
+      #pragma acc parallel loop independent default(none) present(this,levels,stack,nshift,rec,accum,h)
       for(int si=lvlstart;si<lvlend;si++){
         const int c = stack[si];          //Cell from which flow originates
         if(rec[c]==NO_FLOW)
@@ -363,7 +363,7 @@ class FastScape_RBGPU {
         double hnew         = h0;          //Current updated value of focal cell
         double hp           = h0;          //Previous updated value of focal cell
         double diff         = 2*tol;       //Difference between current and previous updated values
-        //#pragma acc loop seq
+        #pragma acc loop seq
         while(std::abs(diff)>tol){
           hnew -= (hnew-h0+fact*std::pow(hnew-hn,neq))/(1.+fact*neq*std::pow(hnew-hn,neq-1));
           diff  = hnew - hp;
@@ -373,7 +373,7 @@ class FastScape_RBGPU {
       }
     }
 
-    // #pragma acc update host(h[0:size])
+    #pragma acc update host(h[0:size])
   }
 
 
