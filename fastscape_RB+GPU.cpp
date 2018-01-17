@@ -33,6 +33,9 @@ void PrintDEM(
 }
 
 
+//Trying as a global
+int nstack;
+
 
 class FastScape_RBGPU {
  private:
@@ -239,8 +242,9 @@ class FastScape_RBGPU {
   }
 
   void GenerateOrder(){
-    #pragma acc update host(rec[0:size],donor[0:8*size],ndon[0:size])
+    //#pragma acc update host(rec[0:size],donor[0:8*size],ndon[0:size])
 
+    //Trying as a local
     int nstack = 0;
 
     levels[0] = 0;
@@ -248,6 +252,11 @@ class FastScape_RBGPU {
 
     const int height = this->height;
     const int width  = this->width;
+
+
+    ///////////////////////////
+    //THIS WORKS
+    ///////////////////////////
 
     //TODO: Outside edge is always NO_FLOW. Maybe this can get loaded once?
     //Load cells without dependencies into the queue
@@ -267,17 +276,36 @@ class FastScape_RBGPU {
     levels[nlevel++] = nstack; 
     assert(nlevel<level_width); 
 
-    #pragma acc update host(stack[0:stack_width])
+    //#pragma acc update host(stack[0:stack_width])
 
     int level_bottom = -1;
+  #ifndef PGI_WAR
     int level_top    = 0;
+  #else
+    volatile int level_top    = 0;
+    int level_num;
+  #endif
+
+    ///////////////////////////
+    //Enabling the pragmas below breaks everything
+    ///////////////////////////
 
     while(level_bottom<level_top){
       level_bottom = level_top;
       level_top    = nstack;
-      //#pragma acc parallel loop independent num_gangs(10) default(none) copy(nstack) present(this,ndon[0:size],donor[0:8*size],stack[0:stack_width])
+
+  #ifdef PGI_WAR
+      level_num    = level_top - level_bottom;
+  #endif
+      #pragma acc parallel loop independent num_gangs(100) default(none) copy(nstack) present(this,ndon[0:size],donor[0:8*size],stack[0:stack_width])
+  #ifdef PGI_WAR
+      for(int si=0;si<level_num;si++){
+        const auto c = stack[si+level_bottom];
+  #else
       for(int si=level_bottom;si<level_top;si++){
         const auto c = stack[si];
+  #endif
+        #pragma acc loop seq
         for(int k=0;k<ndon[c];k++){
           const auto n    = donor[8*c+k];
           int mystack;
@@ -291,6 +319,9 @@ class FastScape_RBGPU {
       levels[nlevel++] = nstack; //Starting a new level      
     }
 
+    // std::cout<<"nstack = "<<nstack<<std::endl;
+    // std::cout<<"nlevel = "<<nlevel<<std::endl;
+
     //End condition for the loop places two identical entries
     //at the end of the stack. Remove one.
     nlevel--;
@@ -299,7 +330,9 @@ class FastScape_RBGPU {
 
     assert(levels[nlevel-1]==nstack);
 
-    #pragma acc update device(stack[0:size],levels[0:size],nlevel)
+    #pragma acc update device(nlevel)
+
+    //#pragma acc update device(stack[0:size],levels[0:size],nlevel)
   }
 
 
