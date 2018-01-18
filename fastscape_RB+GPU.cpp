@@ -305,13 +305,18 @@ class FastScape_RBGPU {
       for(int si=level_bottom;si<level_top;si++){
         const auto c = stack[si];
   #endif
+        const auto ncount = ndon[c];
+        int mystack;
+        #pragma acc atomic 
+        {
+          mystack = nstack;
+          nstack += ncount;
+        }
+
         #pragma acc loop seq
         for(int k=0;k<ndon[c];k++){
           const auto n    = donor[8*c+k];
-          int mystack;
-          #pragma acc atomic capture
-          mystack = nstack++;
-          stack[mystack] = n;
+          stack[mystack++] = n;
           // assert(nstack<=stack_width);
         }
       }
