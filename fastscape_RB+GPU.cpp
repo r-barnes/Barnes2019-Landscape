@@ -307,7 +307,7 @@ class FastScape_RBGPU {
   #endif
         const auto ncount = ndon[c];
         int mystack;
-        #pragma acc atomic 
+        #pragma acc atomic capture
         {
           mystack = nstack;
           nstack += ncount;
