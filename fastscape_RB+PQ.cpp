@@ -398,7 +398,7 @@ class FastScape_RBPQ {
       ndon[i] = 0;
 
     //TODO: Make smaller, explain max
-    stack_width = std::max(100,2*size/omp_get_max_threads()); //Number of stack entries available to each thread
+    stack_width = std::max(100,4*size/omp_get_max_threads()); //Number of stack entries available to each thread
     level_width = std::max(100,size/omp_get_max_threads());   //Number of level entries available to each thread
 
     #pragma omp parallel
