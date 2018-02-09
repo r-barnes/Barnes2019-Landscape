@@ -1,0 +1,13 @@
+#BSUB -P CSC261               #Project to charge the time to
+#BSUB -J quickscape           #job name
+#BSUB -o quickscape.%J.out    #Output name
+#BSUB -nnodes 1               
+#BSUB -W 04:00                #Maximum wall-clock time (HH:MM)
+
+export TESTSYSTEM=summitdev
+
+module load gcc/7.1.1-20170802
+
+cd /ccs/home/spinyfan/quickscape/tests
+
+./tests.sh
