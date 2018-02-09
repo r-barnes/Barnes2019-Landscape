@@ -210,14 +210,17 @@ class FastScape_RBGPU {
     int *const restrict levels = new int[t_level_width]; //TODO
     int  nlevel = 0;
 
-    #pragma acc enter data copyin(this[0:1],h[0:size],nshift[0:8],size) create(accum[0:size],rec[0:size],ndon[0:size],donor[0:8*size],stack[0:t_stack_width],levels[0:t_level_width],nlevel)
+    // #pragma acc enter data copyin(this[0:1],h[0:size],nshift[0:8],size) create(accum[0:size],rec[0:size],ndon[0:size],donor[0:8*size],stack[0:t_stack_width],levels[0:t_level_width],nlevel)
+    #pragma acc enter data map(to:this[0:1],h[0:size],nshift[0:8],size) map(alloc:accum[0:size],rec[0:size],ndon[0:size],donor[0:8*size],stack[0:t_stack_width],levels[0:t_level_width],nlevel)
 
     //! initializing rec
-    #pragma acc parallel loop default(none) present(rec,this)
+    // #pragma acc parallel loop default(none) present(rec,this)
+    #pragma omp target teams distribute parallel for default(none)
     for(int i=0;i<size;i++)
       rec[i] = NO_FLOW;
 
-    #pragma acc parallel loop default(none) present(ndon,this)
+    // #pragma acc parallel loop default(none) present(ndon,this)
+    #pragma omp target teams distribute parallel for default(none)
     for(int i=0;i<size;i++)
       ndon[i] = 0;
 
@@ -228,7 +231,8 @@ class FastScape_RBGPU {
       //COMPUTE RECEIVERS
       /////////////////////////////
       {
-        #pragma acc parallel loop default(none) collapse(2) independent present(this,rec,nshift,h)
+        // #pragma acc parallel loop default(none) collapse(2) independent present(this,rec,nshift,h)
+        #pragma omp target teams distribute parallel for collapse(2) default(none)
         for(int y=2;y<height-2;y++)
         for(int x=2;x<width-2;x++){
           const int c      = y*width+x;
@@ -266,7 +270,8 @@ class FastScape_RBGPU {
       //guaranteed to have sole write-access to its location in the donor array.
 
       {
-        #pragma acc parallel loop default(none) collapse(2) independent present(this,ndon,donor,rec) async(1)
+        // #pragma acc parallel loop default(none) collapse(2) independent present(this,ndon,donor,rec) async(1)
+        #pragma omp target teams distribute parallel for collapse(2) default(none)
         for(int y=1;y<height-1;y++)
         for(int x=1;x<width-1;x++){
           const int c = y*width+x;
@@ -289,7 +294,8 @@ class FastScape_RBGPU {
       /////////////////////////////
       {
         //! adding uplift to landscape
-        #pragma acc parallel loop collapse(2) independent present(this,h[0:size]) async(2)
+        // #pragma acc parallel loop collapse(2) independent present(this,h[0:size]) async(2)
+        #pragma omp target teams distribute parallel for collapse(2) default(none)
         for(int y=2;y<height-2;y++)
         for(int x=2;x<width-2;x++){
           const int c = y*width+x;
@@ -309,15 +315,19 @@ class FastScape_RBGPU {
         levels[0] = 0;
         nlevel    = 1;
 
-        #pragma acc update host(donor[0:8*size], ndon[0:size], rec[0:size]) wait(1)
+        //#pragma acc update host(donor[0:8*size], ndon[0:size], rec[0:size]) wait(1)
 
         //TODO: Outside edge is always NO_FLOW. Maybe this can get loaded once?
         //Load cells without dependencies into the queue
+        #pragma acc parallel loop collapse(2) independent num_gangs(20) present(rec,stack) copy(nstack)
         for(int y=2;y<height-2;y++)
         for(int x=2;x<width -2;x++){
           const int c = y*width+x;
           if(rec[c]==NO_FLOW){
-            stack[nstack++] = c;
+            int mystack;
+            #pragma acc atomic capture
+            mystack = nstack++;
+            stack[mystack] = c;
           }
         }
         //Last cell of this level
@@ -326,14 +336,19 @@ class FastScape_RBGPU {
         int level_bottom = -1;
         int level_top    = 0;
 
+        #pragma acc parallel num_gangs(20) present(rec,stack,nstack,levels,ndon,donor) copy(nstack,level_bottom,level_top)
         while(level_bottom<level_top){
           level_bottom = level_top;
           level_top    = nstack;
+          #pragma acc loop 
           for(int si=level_bottom;si<level_top;si++){
             const auto c = stack[si];
             for(int k=0;k<ndon[c];k++){
               const auto n    = donor[8*c+k];
-              stack[nstack++] = n;
+              int mystack;
+              #pragma acc atomic capture
+              mystack = nstack++;
+              stack[mystack] = n;
             }
           }
 
@@ -344,9 +359,9 @@ class FastScape_RBGPU {
         //at the end of the stack. Remove one.
         nlevel--;
 
-        #pragma acc update device(stack[0:size],levels[0:size],nlevel)
+        //#pragma acc update device(stack[0:size],levels[0:size],nlevel)
 
-        assert(levels[nlevel-1]==nstack);    
+        //assert(levels[nlevel-1]==nstack);    
 
         Tmr_Step4_GenerateOrder.stop();
       }
