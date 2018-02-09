@@ -187,9 +187,7 @@ class FastScape_RBPQ {
  private:
   void ComputeReceivers(){
     //! computing receiver array
-    #pragma omp barrier
-
-    #pragma omp for collapse(2) schedule(static) nowait
+    #pragma omp for collapse(2)
     for(int y=2;y<height-2;y++)
     for(int x=2;x<width-2;x++){
       const int c      = y*width+x;
@@ -221,9 +219,6 @@ class FastScape_RBPQ {
     //Instead, we invert the operation. Each focal cell now examines its
     //neighbours to see if it receives from them. Each focal cell is then
     //guaranteed to have sole write-access to its location in the donor array.
-
-    #pragma omp barrier
-
     #pragma omp for collapse(2) schedule(static) nowait
     for(int y=1;y<height-1;y++)
     for(int x=1;x<width-1;x++){
@@ -284,6 +279,8 @@ class FastScape_RBPQ {
 
     int level_bottom = -1;
     int level_top    = 0;
+
+    #pragma omp barrier //Must ensure ComputeDonors is done before we start the following
 
     while(level_bottom<level_top){
       level_bottom = level_top;
@@ -417,6 +414,7 @@ class FastScape_RBPQ {
       Tmr_Step1_Initialize.stop();
 
       for(int step=0;step<=nstep;step++){
+        #pragma omp barrier //We take the barrier out from within the function, so we can see its effect separately
         Tmr_Step2_DetermineReceivers.start ();   ComputeReceivers  ();                      Tmr_Step2_DetermineReceivers.stop ();
         Tmr_Step3_DetermineDonors.start    ();   ComputeDonors     ();                      Tmr_Step3_DetermineDonors.stop    ();
         Tmr_Step4_GenerateOrder.start      ();   GenerateOrder     (stack,levels,nlevel);   Tmr_Step4_GenerateOrder.stop      ();
