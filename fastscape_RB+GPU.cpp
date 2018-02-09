@@ -33,10 +33,6 @@ void PrintDEM(
 }
 
 
-//Trying as a global
-int nstack;
-
-
 class FastScape_RBGPU {
  private:
   const int    NO_FLOW = -1;
@@ -252,11 +248,6 @@ class FastScape_RBGPU {
 
     const int height = this->height;
     const int width  = this->width;
-
-
-    ///////////////////////////
-    //THIS WORKS
-    ///////////////////////////
 
     //TODO: Outside edge is always NO_FLOW. Maybe this can get loaded once?
     //Load cells without dependencies into the queue
