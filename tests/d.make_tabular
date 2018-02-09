@@ -23,10 +23,13 @@ def main():
         data.append(datum)
       datum = {}
 
-    rem = re.match(r'(.) ([^=]+)=?\s*([^ ]*)\s*(.*)', line);
-    tag = rem.group(1).strip()
-    col = rem.group(2).strip()
-    val = rem.group(3).strip()
+    try:
+      rem = re.match(r'(.) ([^=]+)=?\s*([^ ]*)\s*(.*)', line);
+      tag = rem.group(1).strip()
+      col = rem.group(2).strip()
+      val = rem.group(3).strip()
+    except:
+      print('Bad line: "{0}"'.format(line))
 
     if tag=='A':
       datum['Algorithm'] = col.replace(' ','_')
