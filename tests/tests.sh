@@ -8,6 +8,43 @@ steps=120
 #Programs to run
 exe_prefix=../
 
+if [ "$TESTSYSTEM" == "summitdev" ]; then
+
+  if [ ! -f "z_gpu_$TESTSYSTEM.dat" ]; then
+    echo "RUNNING GPU TESTS"
+
+    progs=( fastscape_RB+GPU.exe )
+
+    #Edge length of a dataset. Number of cells is the square of this value.
+    sizes=( 100 700 1000 7000 10000 ) 
+
+    #Number of repetitions for each dataset size. Statistical significance!
+    reps=( 3 3 3 3 3 )
+    for prog in "${progs[@]}"; do
+    for (( s=0;   s<${#sizes[@]}; s++ )); do
+    for (( rep=0; rep<${reps[s]}; rep++ )); do
+      size=${sizes[s]}
+      echo "# Prog  = $prog"
+      echo "m Size  = $size"
+      echo "m Steps = $steps"
+      echo "m Rep   = $rep"
+      echo "H host  = $host"
+
+      echo "R $exe_prefix$prog $size $steps out_simp_parallel_${prog}_${size}_${steps}_${rep}_${TESTSYSTEM}.dem 123"
+      eval "$exe_prefix$prog $size $steps out_simp_parallel_${prog}_${size}_${steps}_${rep}_${TESTSYSTEM}.dem 123"
+    done
+    done
+    done > >(tee -i "z_gpu_$TESTSYSTEM.dat")
+  fi
+
+fi
+
+exit 0
+
+
+
+
+
 if [ ! -f "z_parallel_sep_thread_$TESTSYSTEM.dat" ]; then
   echo "RUNNING PARALLEL IMPROVED TESTS"
 
@@ -35,7 +72,9 @@ if [ ! -f "z_parallel_sep_thread_$TESTSYSTEM.dat" ]; then
   done > >(tee -i "z_parallel_sep_thread_$TESTSYSTEM.dat")
 fi
 
-exit 0
+
+
+
 
 if [ ! -f "z_parallel_improved_$TESTSYSTEM.dat" ]; then
   echo "RUNNING PARALLEL IMPROVED TESTS"
