@@ -414,13 +414,13 @@ class FastScape_RBPQ {
       Tmr_Step1_Initialize.stop();
 
       for(int step=0;step<=nstep;step++){
-        #pragma omp barrier //We take the barrier out from within the function, so we can see its effect separately
         Tmr_Step2_DetermineReceivers.start ();   ComputeReceivers  ();                      Tmr_Step2_DetermineReceivers.stop ();
         Tmr_Step3_DetermineDonors.start    ();   ComputeDonors     ();                      Tmr_Step3_DetermineDonors.stop    ();
         Tmr_Step4_GenerateOrder.start      ();   GenerateOrder     (stack,levels,nlevel);   Tmr_Step4_GenerateOrder.stop      ();
         Tmr_Step5_FlowAcc.start            ();   ComputeFlowAcc    (stack,levels,nlevel);   Tmr_Step5_FlowAcc.stop            ();
         Tmr_Step6_Uplift.start             ();   AddUplift         (stack,levels,nlevel);   Tmr_Step6_Uplift.stop             ();
         Tmr_Step7_Erosion.start            ();   Erode             (stack,levels,nlevel);   Tmr_Step7_Erosion.stop            ();
+        #pragma omp barrier //Ensure threads synchronize after erosion so we calculate receivers correctly
 
         #pragma omp master
         if( step%20==0 )
