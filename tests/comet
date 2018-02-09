@@ -7,6 +7,8 @@
 #SBATCH --export=ALL
 #SBATCH -t 15:00:00
 
+export TESTSYSTEM=comet
+
 export LD_PRELOAD=/share/apps/compute/gcc-6.2.0/lib64/libstdc++.so.6
 
 ./tests.sh
