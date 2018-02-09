@@ -274,11 +274,16 @@ class FastScape_BWPF {
     for(int i=0;i<size;i++)
       accum[i] = cell_area;
 
-    for(int s=size-1;s>=0;s--){
-      const int c = stack[s];
-      if(rec[c]!=NO_FLOW){
-        const int n = c+nshift[rec[c]];
-        accum[n]   += accum[c];
+    #pragma omp parallel for schedule(dynamic)
+    for(int ss=0;ss<stack_start.size()-1;ss++){
+      const int sstart = stack_start.at(ss);
+      const int send   = stack_start.at(ss+1);
+      for(int s=send-1;s>=sstart;s--){
+        const int c = stack[s];
+        if(rec[c]!=NO_FLOW){
+          const int n = c+nshift[rec[c]];
+          accum[n]   += accum[c];
+        }
       }
     }   
   } 
