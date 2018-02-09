@@ -393,7 +393,7 @@ int main(int argc, char **argv){
 
   seed_rand(std::stoul(argv[4]));
 
-  std::cout<<"A FastScape B&W+P"<<std::endl;
+  std::cout<<"A FastScape B&W+PI"<<std::endl;
   std::cout<<"C Richard Barnes TODO"<<std::endl;
   std::cout<<"h git_hash    = "<<GIT_HASH<<std::endl;
   std::cout<<"m Random seed = "<<argv[4]<<std::endl;
