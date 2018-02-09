@@ -7,7 +7,7 @@
 #include <string>
 
 ///Maximum number of threads this class should deal with
-#define PRNG_THREAD_MAX 200
+const int PRNG_THREAD_MAX = 200;
 
 #ifdef _OPENMP
   #include <omp.h>
