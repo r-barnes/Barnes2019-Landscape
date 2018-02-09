@@ -270,6 +270,7 @@ class FastScape_BWPF {
 
   void ComputeFlowAcc(){
     //! computing drainage area
+    #pragma omp parallel for
     for(int i=0;i<size;i++)
       accum[i] = cell_area;
 
