@@ -131,62 +131,6 @@ class FastScape_BWPF {
     delete[] h;
   }
 
-  void printDiagnostic(std::string msg){
-    return;
-    std::cerr<<"\n#################\n"<<msg<<std::endl;
-
-    std::cerr<<"idx: "<<std::endl;
-    for(int y=0;y<height;y++){
-      for(int x=0;x<width;x++){
-        std::cerr<<std::setw(6)<<std::setprecision(3)<<h[y*width+x];
-        std::cerr<<"| ";
-      }
-      std::cerr<<"\n";
-    }
-
-    std::cerr<<"idx: "<<std::endl;
-    for(int y=0;y<height;y++){
-      for(int x=0;x<width;x++){
-        std::cerr<<std::setw(6)<<(y*width+x);
-        std::cerr<<"| ";
-      }
-      std::cerr<<"\n";
-    }
-
-    std::cerr<<"Rec: "<<std::endl;
-    std::cerr<<"NO_FLOW = "<<NO_FLOW<<std::endl;
-    for(int y=0;y<height;y++){
-      for(int x=0;x<width;x++){
-        std::cerr<<std::setw(6)<<rec[y*width+x];
-        std::cerr<<"| ";
-      }
-      std::cerr<<"\n";
-    }    
-
-    std::cerr<<"Donor: "<<std::endl;
-    for(int x=0;x<width;x++)
-      std::cerr<<std::setw(24)<<x<<"|";
-    std::cerr<<std::endl;
-    for(int y=0;y<height;y++){
-      for(int x=0;x<width;x++){
-        const int c = y*width+x;
-        for(int ni=0;ni<8;ni++)
-          std::cerr<<std::setw(3)<<donor[8*c+ni];
-        std::cerr<<"|";
-      }
-      std::cerr<<"\n";
-    }    
-
-    std::cerr<<"ndon: "<<std::endl;
-    for(int y=0;y<height;y++){
-      for(int x=0;x<width;x++){
-        std::cerr<<std::setw(6)<<ndon[y*width+x];
-        std::cerr<<"| ";
-      }
-      std::cerr<<"\n";
-    }        
-  }
-
  private:
   void ComputeReceivers(){
     //! computing receiver array
