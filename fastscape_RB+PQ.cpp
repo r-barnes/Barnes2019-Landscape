@@ -196,7 +196,7 @@ class FastScape_RBPQ {
     }
 
     #pragma omp for schedule(static) nowait
-    for(int x=1;x<width-1;x++){
+    for(int x=2;x<width-2;x++){
       stack[nstack++] =          1*width+x; assert(nstack<stack_width);
       stack[nstack++] = (height-2)*width+x; assert(nstack<stack_width);
     }
@@ -290,14 +290,12 @@ class FastScape_RBPQ {
     const int nlevel
   ){
     //#pragma omp parallel default(none)
-    for(int li=0;li<nlevel-1;li++){
+    for(int li=2;li<nlevel-1;li++){
       const int lvlstart = levels[li];
       const int lvlend   = levels[li+1];
       #pragma omp simd
       for(int si=lvlstart;si<lvlend;si++){
         const int c = stack[si];          //Cell from which flow originates
-        if(rec[c]==NO_FLOW)
-          continue;
         const int n = c+nshift[rec[c]];    //Cell receiving the flow
 
         const double length = dr[rec[c]];
