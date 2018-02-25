@@ -277,6 +277,7 @@ class FastScape_RBPQ {
     const int &nlevel
   ){
     //Start at levels[1] so we don't elevate the outer edge
+    #pragma omp simd
     for(int i=levels[1];i<levels[nlevel-1];i++){
       const int c = stack[i];
       h[c]       += ueq*dt; 
@@ -296,7 +297,7 @@ class FastScape_RBPQ {
       #pragma omp simd
       for(int si=lvlstart;si<lvlend;si++){
         const int c = stack[si];          //Cell from which flow originates
-        const int n = c+nshift[rec[c]];    //Cell receiving the flow
+        const int n = c+nshift[rec[c]];   //Cell receiving the flow
 
         const double length = dr[rec[c]];
         const double fact   = keq*dt*std::pow(accum[c],meq)/std::pow(length,neq);
