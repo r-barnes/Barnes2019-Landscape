@@ -253,24 +253,22 @@ class FastScape_RBPF {
 
 
   void Erode(){
-    for(int li=0;li<nlevel-1;li++){
+    for(int li=1;li<nlevel-1;li++){
       const int lvlstart = levels[li];
       const int lvlend   = levels[li+1];
       const int lvlsize  = lvlend-lvlstart;
       #pragma omp parallel for simd if(lvlsize>500)
       for(int si=lvlstart;si<lvlend;si++){
         const int c = stack[si];          //Cell from which flow originates
-        if(rec[c]==NO_FLOW)
-          continue;
         const int n = c+nshift[rec[c]];   //Cell receiving the flow
 
         const double length = dr[rec[c]];
         const double fact   = keq*dt*std::pow(accum[c],meq)/std::pow(length,neq);
-        const double h0     = h[c];      //Elevation of focal cell
-        const double hn     = h[n];      //Elevation of neighbouring (receiving, lower) cell
-        double hnew         = h0;        //Current updated value of focal cell
-        double hp           = h0;        //Previous updated value of focal cell
-        double diff         = 2*tol;     //Difference between current and previous updated values
+        const double h0     = h[c];        //Elevation of focal cell
+        const double hn     = h[n];        //Elevation of neighbouring (receiving, lower) cell
+        double hnew         = h0;          //Current updated value of focal cell
+        double hp           = h0;          //Previous updated value of focal cell
+        double diff         = 2*tol;       //Difference between current and previous updated values
         while(std::abs(diff)>tol){
           hnew -= (hnew-h0+fact*std::pow(hnew-hn,neq))/(1.+fact*neq*std::pow(hnew-hn,neq-1));
           diff  = hnew - hp;
