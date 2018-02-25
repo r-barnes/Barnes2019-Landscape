@@ -316,15 +316,13 @@ class FastScape_RBGPU {
 
   void Erode(){
     // #pragma acc parallel default(none) present(this,levels,stack,nshift,rec,accum,h)
-    for(int li=0;li<nlevel-1;li++){
+    for(int li=1;li<nlevel-1;li++){
       const int lvlstart = levels[li];
       const int lvlend   = levels[li+1];
       #pragma acc parallel loop independent default(none) present(this,levels,stack,nshift,rec,accum,h)
       for(int si=lvlstart;si<lvlend;si++){
         const int c = stack[si];          //Cell from which flow originates
-        if(rec[c]==NO_FLOW)
-          continue;
-        const int n = c+nshift[rec[c]];    //Cell receiving the flow
+        const int n = c+nshift[rec[c]];   //Cell receiving the flow
 
         const double length = dr[rec[c]];
         const double fact   = keq*dt*std::pow(accum[c],meq)/std::pow(length,neq);
