@@ -131,7 +131,7 @@ class FastScape_RBPQ {
  private:
   void ComputeReceivers(){
     //! computing receiver array
-    #pragma omp for collapse(2)
+    #pragma omp for simd collapse(2)
     for(int y=2;y<height-2;y++)
     for(int x=2;x<width-2;x++){
       const int c      = y*width+x;
@@ -163,7 +163,7 @@ class FastScape_RBPQ {
     //Instead, we invert the operation. Each focal cell now examines its
     //neighbours to see if it receives from them. Each focal cell is then
     //guaranteed to have sole write-access to its location in the donor array.
-    #pragma omp for collapse(2) schedule(static) nowait
+    #pragma omp for simd collapse(2) schedule(static) nowait
     for(int y=1;y<height-1;y++)
     for(int x=1;x<width-1;x++){
       const int c = y*width+x;
