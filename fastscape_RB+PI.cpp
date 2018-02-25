@@ -226,16 +226,16 @@ class FastScape_RBPF {
     for(int i=0;i<size;i++)
       accum[i] = cell_area;
 
-    for(int li=nlevel-2;li>=0;li--){
+    for(int li=nlevel-3;li>=1;li--){
       const int lvlstart = levels[li];
       const int lvlend   = levels[li+1];
       const int lvlsize  = lvlend-lvlstart;
       #pragma omp parallel for default(none) shared(li) if(lvlsize>500)
       for(int si=lvlstart;si<lvlend;si++){
         const int c = stack[si];
-        if(rec[c]!=NO_FLOW){
-          const int n = c+nshift[rec[c]];
-          accum[n]   += accum[c];
+        for(int k=0;k<ndon[c];k++){
+          const auto n = donor[8*c+k];
+          accum[c]    += accum[n];
         }
       }
     }    
