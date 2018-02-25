@@ -128,7 +128,7 @@ class FastScape_RBPF {
  private:
   void ComputeReceivers(){
     //! computing receiver array
-    #pragma omp parallel for collapse(2)
+    #pragma omp parallel for simd collapse(2)
     for(int y=2;y<height-2;y++)
     for(int x=2;x<width-2;x++){
       const int c      = y*width+x;
@@ -161,7 +161,7 @@ class FastScape_RBPF {
     //neighbours to see if it receives from them. Each focal cell is then
     //guaranteed to have sole write-access to its location in the donor array.
 
-    #pragma omp parallel for collapse(2)
+    #pragma omp parallel for simd collapse(2)
     for(int y=1;y<height-1;y++)
     for(int x=1;x<width-1;x++){
       const int c = y*width+x;
@@ -257,7 +257,7 @@ class FastScape_RBPF {
       const int lvlstart = levels[li];
       const int lvlend   = levels[li+1];
       const int lvlsize  = lvlend-lvlstart;
-      #pragma omp parallel for if(lvlsize>500)
+      #pragma omp parallel for simd if(lvlsize>500)
       for(int si=lvlstart;si<lvlend;si++){
         const int c = stack[si];          //Cell from which flow originates
         if(rec[c]==NO_FLOW)
