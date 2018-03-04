@@ -6,11 +6,13 @@
 #include <iomanip>
 #include <iostream>
 #include <limits>
-#include <omp.h>
+#include <omp.h>  //Used for OpenMP run-time functions
 #include "random.hpp"
 #include <vector>
 #include "CumulativeTimer.hpp"
 
+//Used to handle situations in which OpenMP is not available
+//(This scenario has not been extensively tested)
 #ifndef _OPENMP
   #define omp_get_thread_num()  0
   #define omp_get_num_threads() 1
@@ -18,7 +20,10 @@
 #endif
 
 
-
+///This is a quick-and-dirty, zero-dependency function for saving the outputs of
+///the model in ArcGIS ASCII DEM format (aka Arc/Info ASCII Grid, AAIGrid).
+///Production code for experimentation should probably use GeoTIFF or a similar
+///format as it will have a smaller file size and, thus, save quicker.
 void PrintDEM(
   const std::string filename, 
   const double *const h,
@@ -26,12 +31,14 @@ void PrintDEM(
   const int height
 ){
   std::ofstream fout(filename.c_str());
+  //Since the outer ring of the dataset is a halo used for simplifying
+  //neighbour-finding logic, we do not save it to the output here.
   fout<<"ncols "<<(width- 2)<<"\n";
   fout<<"nrows "<<(height-2)<<"\n";
   fout<<"xllcorner 637500.000\n"; //Arbitrarily chosen value
   fout<<"yllcorner 206000.000\n"; //Arbitrarily chosen value
   fout<<"cellsize 500.000\n";     //Arbitrarily chosen value
-  fout<<"NODATA_value -9999\n";
+  fout<<"NODATA_value -9999\n";   //Value which is guaranteed not to correspond to an actual data value
   for(int y=1;y<height-1;y++){
     for(int x=1;x<width-1;x++)
       fout<<h[y*width+x]<<" ";
@@ -41,24 +48,28 @@ void PrintDEM(
 
 
 
+///The entire model is contained in a handy class, which makes it easy to set up
+///and solve many such models.
 class FastScape_RBPQ {
  private:
+  //Value used to indicate that a cell had no downhill neighbour and, thus, does
+  //not flow anywhere.
   const int    NO_FLOW = -1;
-  const double SQRT2   = 1.414213562373095048801688724209698078569671875376948;
+  const double SQRT2   = 1.414213562373095048801688724209698078569671875376948; //Yup, this is overkill.
 
 
  public:
   //NOTE: Having these constants specified in the class rather than globally
   //results in a significant speed loss. However, it is better to have them here
   //under the assumption that they'd be dynamic in a real implementation.
-  const double keq       = 2e-6;
-  const double neq       = 2;
-  const double meq       = 0.8;
-  const double ueq       = 2e-3;
-  const double dt        = 1000.;
-  const double dr[8]     = {1,SQRT2,1,SQRT2,1,SQRT2,1,SQRT2};  
-  const double tol       = 1e-3;
-  const double cell_area = 40000;
+  const double keq       = 2e-6;   //Stream power equation constant (coefficient)
+  const double neq       = 2;      //Stream power equation constant (slope modifier)
+  const double meq       = 0.8;    //Stream power equation constant (area modifier)
+  const double ueq       = 2e-3;   //Rate of uplift
+  const double dt        = 1000.;  //Timestep interval
+  const double dr[8]     = {1,SQRT2,1,SQRT2,1,SQRT2,1,SQRT2}; //Distance between adjacent cell centers on a rectangular grid arbitrarily scale to cell edge lengths of 1
+  const double tol       = 1e-3;   //Tolerance for Newton-Rhapson convergence while solving implicit Euler
+  const double cell_area = 40000;  //Area of a single cell
 
 
  private:
@@ -66,20 +77,34 @@ class FastScape_RBPQ {
   int height;       //Height of DEM
   int size;         //Size of DEM (width*height)
 
-  double *h;        //Digital elevation model (height)
-  double *accum;    //Flow accumulation at each point
-  int    *rec;      //Index of receiving cell
-  int    *donor;    //Indices of a cell's donor cells
-  int    *ndon;     //How many donors a cell has
+  //The dataset is set up so that the outermost edge is never actually used:
+  //it's a halo which allows every cell that is actually processed to consider
+  //its neighbours in all 8 directions without having to check first to see if
+  //it is an edge cell. The ring of second-most outer cells is set to a fixed
+  //value to which everything erodes (in this model).
 
-  int stack_width;  //Number of cells allowed in the stack
-  int level_width;  //Number of cells allowed in a level
-
-  //nshift offsets:
+  //Rec directions (also used for nshift offsets) - see below for details
   //1 2 3
   //0   4
   //7 6 5
-  int    nshift[8]; //Offset from a focal cell's index to its neighbours
+
+  double *h;        //Digital elevation model (height)
+  double *accum;    //Flow accumulation at each point
+  int    *rec;      //Direction of receiving cell
+  int    *donor;    //Indices of a cell's donor cells
+  int    *ndon;     //How many donors a cell has
+  int    *stack;    //Indices of cells in the order they should be processed
+  int    nshift[8]; //Offset from a focal cell's index to its neighbours in terms of flat indexing
+
+  //A level is a set of cells which can all be processed simultaneously.
+  //Topologically, cells within a level are neither descendents or ancestors of
+  //each other in a topological sorting, but are the same number of steps from
+  //the edge of the dataset.
+  int    *levels;   //Indices of locations in stack where a level begins and ends
+  int    nlevel;    //Number of levels used
+
+  int stack_width;  //Number of cells allowed in the stack
+  int level_width;  //Number of cells allowed in a level
 
   CumulativeTimer Tmr_Step1_Initialize;
   CumulativeTimer Tmr_Step2_DetermineReceivers;
@@ -98,8 +123,16 @@ class FastScape_RBPQ {
     for(int x=0;x<width;x++){
       const int c = y*width+x;
       h[c]  = rand()/(double)RAND_MAX;
+
+      //Outer edge is set to 0 and never touched again. It is used only as a
+      //convenience so we don't have to worry when a focal cell looks at its
+      //neighbours.
       if(x == 0 || y==0 || x==width-1 || y==height-1)
         h[c] = 0;
+
+      //Second outer-most edge is set to 0 and never touched again. This is the
+      //baseline to which all cells would erode where it not for uplift. You can
+      //think of this as being "sea level".
       if(x == 1 || y==1 || x==width-2 || y==height-2)
         h[c] = 0;
     }
@@ -107,7 +140,9 @@ class FastScape_RBPQ {
 
 
  public:
+  ///Initializing code
   FastScape_RBPQ(const int width0, const int height0)
+    //Initialize code for finding neighbours of a cell
     : nshift{-1,-width0-1,-width0,-width0+1,1,width0+1,width0,width0-1}
   {
     Tmr_Overall.start();
@@ -116,19 +151,28 @@ class FastScape_RBPQ {
     height = height0;
     size   = width*height;
 
-    h      = new double[size];
+    h      = new double[size];   //Memory for terrain height
 
-    GenerateRandomTerrain();
+    GenerateRandomTerrain();     //Could replace this with custom initializer
 
     Tmr_Step1_Initialize.stop();
     Tmr_Overall.stop();
   }
 
+
+
+  ///Destructor: ensures that `h` is freed when the class goes out of scope
   ~FastScape_RBPQ(){
     delete[] h;
   }
 
+
+
  private:
+  ///The receiver of a focal cell is the cell which receives the focal cells'
+  ///flow. Here, we model the receiving cell as being the one connected to the
+  ///focal cell by the steppest gradient. If there is no local gradient, than
+  ///the special value NO_FLOW is assigned.
   void ComputeReceivers(){
     //! computing receiver array
     #pragma omp for simd collapse(2)
