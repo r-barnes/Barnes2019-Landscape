@@ -1,3 +1,4 @@
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <cstdlib>
@@ -18,7 +19,7 @@
 ///format as it will have a smaller file size and, thus, save quicker.
 void PrintDEM(
   const std::string filename, 
-  const double *const h,
+  const std::vector<double>& h,
   const int width,
   const int height
 ){
@@ -80,19 +81,19 @@ class FastScape_RBP {
   //0   4
   //7 6 5
 
-  double *h;        //Digital elevation model (height)
-  double *accum;    //Flow accumulation at each point
-  int    *rec;      //Direction of receiving cell
-  int    *donor;    //Indices of a cell's donor cells
-  int    *ndon;     //How many donors a cell has
-  int    *stack;    //Indices of cells in the order they should be processed
-  int    nshift[8]; //Offset from a focal cell's index to its neighbours in terms of flat indexing
+  std::vector<double> h;        //Digital elevation model (height)
+  std::vector<double> accum;    //Flow accumulation at each point
+  std::vector<int>    rec;      //Direction of receiving cell
+  std::vector<int>    donor;    //Indices of a cell's donor cells
+  std::vector<int>    ndon;     //How many donors a cell has
+  std::vector<int>    stack;    //Indices of cells in the order they should be processed
+  std::array<int,8>   nshift;   //Offset from a focal cell's index to its neighbours in terms of flat indexing
 
   //A level is a set of cells which can all be processed simultaneously.
   //Topologically, cells within a level are neither descendents or ancestors of
   //each other in a topological sorting, but are the same number of steps from
   //the edge of the dataset.
-  int    *levels;   //Indices of locations in stack where a level begins and ends
+  std::vector<int>    levels;   //Indices of locations in stack where a level begins and ends
   int    nlevel;    //Number of levels used
 
   int stack_width;  //Number of cells allowed in the stack
@@ -144,19 +145,12 @@ class FastScape_RBP {
     height = height0;
     size   = width*height;
 
-    h      = new double[size];   //Memory for terrain height
+    h.resize(size);   //Memory for terrain height
 
     GenerateRandomTerrain();     //Could replace this with custom initializer
 
     Tmr_Step1_Initialize.stop();
     Tmr_Overall.stop();
-  }
-
-
-
-  ///Destructor: ensures that `h` is freed when the class goes out of scope
-  ~FastScape_RBP(){
-    delete[] h;
   }
 
 
@@ -279,8 +273,8 @@ class FastScape_RBP {
       accum[i] = cell_area;
 
     //Highly-elevated cells pass their flow to less elevated neighbour cells.
-    //The stack is ordered so that higher cells are keyed to higher indices in
-    //the stack; therefore, parsing the stack in reverse ensures that fluid
+    //The queue is ordered so that higher cells are keyed to higher indices in
+    //the queue; therefore, parsing the queue in reverse ensures that fluid
     //flows downhill.
     for(int s=size-1;s>=0;s--){
       const int c = stack[s];
@@ -339,6 +333,7 @@ class FastScape_RBP {
         const int n = c+nshift[rec[c]];  //Cell receiving the flow
 
         const double length = dr[rec[c]];
+        //`fact` contains a set of values which are constant throughout the integration
         const double fact   = keq*dt*std::pow(accum[c],meq)/std::pow(length,neq);
         const double h0     = h[c];      //Elevation of focal cell
         const double hn     = h[n];      //Elevation of neighbouring (receiving, lower) cell
@@ -357,21 +352,27 @@ class FastScape_RBP {
 
 
  public:
+
+  ///Run the model forward for a specified number of timesteps. No new
+  ///initialization is done. This allows the model to be stopped, the terrain
+  ///altered, and the model continued. For space-efficiency, a number of
+  ///temporary arrays are created each time this is run, so repeatedly running
+  ///this function for the same model will likely not be performant due to
+  ///reallocations. If that is your use case, you'll want to modify your code
+  ///appropriately.
   void run(const int nstep){
     Tmr_Overall.start();
 
     Tmr_Step1_Initialize.start();
 
-    accum  = new double[size]; //Stores flow accumulation
-    rec    = new int[size];    //Array of Receiver directions
-    ndon   = new int[size];    //Number of donors each cell has
-    donor  = new int[8*size];  //Array listing the donors of each cell (up to 8 for a rectangular grid)
-
-    //TODO: Make smaller, explain max
     stack_width = size; //Number of stack entries available to each thread
     level_width = size; //Number of level entries available to each thread
 
-    stack  = new int[stack_width];  //Order in which to process cells
+    accum.resize(  size);  //Stores flow accumulation
+    rec.resize  (  size);  //Array of Receiver directions
+    ndon.resize (  size);  //Number of donors each cell has
+    donor.resize(8*size);  //Array listing the donors of each cell (up to 8 for a rectangular grid)
+    stack.resize(stack_width);  //Order in which to process cells
 
     //It's difficult to know how much memory should be allocated for levels. For
     //a square DEM with isotropic dispersion this is approximately sqrt(E/2). A
@@ -379,7 +380,7 @@ class FastScape_RBP {
     //levels. A tortorously sinuous river may have up to E*E levels. We
     //compromise and choose a number of levels equal to the perimiter because
     //why not?
-    levels = new int[level_width]; //TODO: Make smaller to `2*width+2*height`
+    levels.resize(2*width+2*height); 
 
     ///All receivers initially point to nowhere
     #pragma omp parallel for
@@ -414,18 +415,18 @@ class FastScape_RBP {
     //Free up memory, except for the resulting landscape height field prior to
     //exiting so that unnecessary space is not used when the model is not being
     //run.
-    delete[] accum;
-    delete[] rec;
-    delete[] ndon;
-    delete[] stack;
-    delete[] donor;
-    delete[] levels;
+    accum .clear();   accum .shrink_to_fit();
+    rec   .clear();   rec   .shrink_to_fit();
+    ndon  .clear();   ndon  .shrink_to_fit();
+    stack .clear();   stack .shrink_to_fit();
+    donor .clear();   donor .shrink_to_fit();
+    levels.clear();   levels.shrink_to_fit();
   }
 
 
 
   ///Returns a pointer to the data so that it can be copied, printed, &c.
-  double* getH() const {
+  std::vector<double>& getH() {
     return h;
   }
 };
@@ -455,7 +456,7 @@ int main(int argc, char **argv){
 
   //Uses the RichDEM machine-readable line prefixes
   //Name of algorithm
-  std::cout<<"A FastScape RB"<<std::endl;                
+  std::cout<<"A FastScape RB+P"<<std::endl;                
   //Citation for algorithm
   std::cout<<"C Richard Barnes TODO"<<std::endl;
   //Git hash of code used to produce outputs of algorithm
