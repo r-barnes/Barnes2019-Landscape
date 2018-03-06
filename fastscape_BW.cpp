@@ -270,7 +270,7 @@ class FastScape_BW {
       const int c = stack[s];            //Cell from which flow originates
       if(rec[c]==NO_FLOW)              //Ignore cells with no receiving neighbour
         continue;
-        const int n = c+nshift[rec[c]];  //Cell receiving the flow
+      const int n = c+nshift[rec[c]];  //Cell receiving the flow
 
       const double length = dr[rec[c]];
       //`fact` contains a set of values which are constant throughout the integration
