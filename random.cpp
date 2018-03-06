@@ -20,14 +20,17 @@ void seed_rand(unsigned long seed){
   #pragma omp parallel      //All threads must come here
   {
     #pragma omp critical    //But only one at a time
-    if(seed==0){
-      std::uint_least32_t seed_data[std::mt19937::state_size];
-      std::random_device r;
-      std::generate_n(seed_data, std::mt19937::state_size, std::ref(r));
-      std::seed_seq q(std::begin(seed_data), std::end(seed_data));
-      rand_engine().seed(q);
-    } else
-      rand_engine().seed( seed*static_cast<unsigned int>(omp_get_thread_num()) );
+    {
+      if(seed==0){
+        std::uint_least32_t seed_data[std::mt19937::state_size];
+        std::random_device r;
+        std::generate_n(seed_data, std::mt19937::state_size, std::ref(r));
+        std::seed_seq q(std::begin(seed_data), std::end(seed_data));
+        rand_engine().seed(q);
+      } else {
+        rand_engine().seed( seed*static_cast<unsigned int>(omp_get_thread_num()) );
+      }
+    }
   }
 }
 
