@@ -260,7 +260,7 @@ class FastScape_BWPF {
     //the stack; therefore, parsing the stack in reverse ensures that fluid
     //flows downhill.
     #pragma omp parallel for schedule(dynamic)
-    for(int ss=0;ss<stack_start.size()-1;ss++){
+    for(unsigned int ss=0;ss<stack_start.size()-1;ss++){
       const int sstart = stack_start.at(ss);
       const int send   = stack_start.at(ss+1);
       for(int s=send-1;s>=sstart;s--){
