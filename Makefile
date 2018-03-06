@@ -6,7 +6,7 @@ WARNINGS = -Wall -Wpedantic -pedantic -Wall -Wextra -Wcast-align -Wcast-qual -Wc
 
 .PHONY: all
 
-all: fastscape_BW.exe fastscape_BW+P.exe fastscape_BW+PI.exe fastscape_RB.exe fastscape_RB+P.exe fastscape_RB+PI.exe fastscape_RB+PQ.exe fastscape_RB+GPU.exe fastscape_BW+PQ.exe
+all: fastscape_BW.exe fastscape_BW+P.exe fastscape_BW+PI.exe fastscape_RB.exe fastscape_RB+P.exe fastscape_RB+PI.exe fastscape_RB+PQ.exe fastscape_RB+GPU.exe
 
 fastscape_BW.exe: fastscape_BW.cpp  
 	$(CXX) $(CFLAGS) $(WARNINGS) -o fastscape_BW.exe    CumulativeTimer.cpp  random.cpp  fastscape_BW.cpp        -Wno-unknown-pragmas   
