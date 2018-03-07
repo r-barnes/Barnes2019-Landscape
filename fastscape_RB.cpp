@@ -113,7 +113,7 @@ class FastScape_RB {
     for(int y=0;y<height;y++)
     for(int x=0;x<width;x++){
       const int c = y*width+x;
-      h[c]  = rand()/(double)RAND_MAX;
+      h[c]  = uniform_rand_real(0,1);
 
       //Outer edge is set to 0 and never touched again. It is used only as a
       //convenience so we don't have to worry when a focal cell looks at its

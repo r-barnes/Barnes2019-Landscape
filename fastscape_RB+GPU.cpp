@@ -93,7 +93,7 @@ class FastScape_RBGPU {
     for(int y=0;y<height;y++)
     for(int x=0;x<width;x++){
       const int c = y*width+x;
-      h[c]  = rand()/(double)RAND_MAX;
+      h[c]  = uniform_rand_real(0,1);
       if(x == 0 || y==0 || x==width-1 || y==height-1)
         h[c] = 0;
       if(x == 1 || y==1 || x==width-2 || y==height-2)

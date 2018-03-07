@@ -11,11 +11,13 @@ rm -rf out_*.dem*
 ./fastscape_RB+PQ.exe  501 120 out_RB+PQ.dem  123
 ./fastscape_RB+GPU.exe 501 120 out_RB+GPU.dem 123
 
-rd_compare authoritative2.dem out_BW.dem    
-rd_compare authoritative2.dem out_BW+P.dem  
-rd_compare authoritative2.dem out_BW+PI.dem  
-rd_compare authoritative2.dem out_RB.dem    
-rd_compare authoritative2.dem out_RB+P.dem  
-rd_compare authoritative2.dem out_RB+PI.dem  
-rd_compare authoritative2.dem out_RB+PQ.dem 
-rd_compare authoritative2.dem out_RB+GPU.dem 
+#This script uses `rd_compare` from the RichDEM library.
+#Obtain it with `pip3 install richdem` or use your own comparison tools.
+rd_compare out_BW.dem out_BW.dem    
+rd_compare out_BW.dem out_BW+P.dem  
+rd_compare out_BW.dem out_BW+PI.dem  
+rd_compare out_BW.dem out_RB.dem    
+rd_compare out_BW.dem out_RB+P.dem  
+rd_compare out_BW.dem out_RB+PI.dem  
+rd_compare out_BW.dem out_RB+PQ.dem 
+rd_compare out_BW.dem out_RB+GPU.dem 
