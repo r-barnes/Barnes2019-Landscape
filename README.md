@@ -53,6 +53,22 @@ Run
 
 to compile all GPU code using the PGI compiler.
 
+
+
+Correctness
+-----------
+
+Run
+
+    ./compare.sh
+
+to ensure that all algorithms are producing the same output
+
+
+
+Empirical Comparisons
+---------------------
+
 Run
 
     ./tests/tests.sh
