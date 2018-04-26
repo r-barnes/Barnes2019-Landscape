@@ -8,7 +8,7 @@ Accelerating a landscape evolution model with parallelism
 
 **Corresponding Author**: Richard Barnes (richard.barnes@berkeley.edu)
 
-**DOI Number of Manuscript**: TODO
+**DOI Number of Manuscript**: https://arxiv.org/abs/1803.02977
 
 **Code Repositories**
  * [Author's GitHub Repository](https://github.com/r-barnes/Barnes2018-Landscape)
