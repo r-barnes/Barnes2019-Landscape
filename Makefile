@@ -6,32 +6,11 @@ WARNINGS = -Wall -Wpedantic -pedantic -Wall -Wextra -Wcast-align -Wcast-qual -Wc
 
 .PHONY: all
 
-all: fastscape_BW.exe fastscape_BW+P.exe fastscape_BW+PI.exe fastscape_RB.exe fastscape_RB+P.exe fastscape_RB+PI.exe fastscape_RB+PQ.exe fastscape_RB+GPU.exe
+all: quickscape.exe
 
-fastscape_BW.exe: fastscape_BW.cpp  
-	$(CXX) $(CFLAGS) $(WARNINGS) -o fastscape_BW.exe    CumulativeTimer.cpp  random.cpp  fastscape_BW.cpp        -Wno-unknown-pragmas   
-
-fastscape_BW+P.exe: fastscape_BW+P.cpp
-	$(CXX) $(CFLAGS) $(WARNINGS) -o fastscape_BW+P.exe  CumulativeTimer.cpp  random.cpp  fastscape_BW+P.cpp      -fopenmp
-
-fastscape_BW+PI.exe: fastscape_BW+PI.cpp
-	$(CXX) $(CFLAGS) $(WARNINGS) -o fastscape_BW+PI.exe  CumulativeTimer.cpp  random.cpp  fastscape_BW+PI.cpp      -fopenmp
-
-fastscape_RB.exe: fastscape_RB.cpp  
-	$(CXX) $(CFLAGS) $(WARNINGS) -o fastscape_RB.exe    CumulativeTimer.cpp  random.cpp  fastscape_RB.cpp        -Wno-unknown-pragmas   
-
-fastscape_RB+P.exe: fastscape_RB+P.cpp  
-	$(CXX) $(CFLAGS) $(WARNINGS) -o fastscape_RB+P.exe  CumulativeTimer.cpp  random.cpp  fastscape_RB+P.cpp      -fopenmp
-
-fastscape_RB+PI.exe: fastscape_RB+PI.cpp  
-	$(CXX) $(CFLAGS) $(WARNINGS) -o fastscape_RB+PI.exe  CumulativeTimer.cpp  random.cpp  fastscape_RB+PI.cpp      -fopenmp
-
-fastscape_RB+PQ.exe: fastscape_RB+PQ.cpp	
-	$(CXX) $(CFLAGS) $(WARNINGS) -o fastscape_RB+PQ.exe CumulativeTimer.cpp  random.cpp  fastscape_RB+PQ.cpp     -fopenmp
-
-fastscape_RB+GPU.exe: fastscape_RB+GPU.cpp
+quickscape.exe: random.cpp CumulativeTimer.cpp fastscape_BW.cpp fastscape_BW+P.cpp fastscape_BW+PI.cpp fastscape_RB.cpp fastscape_RB+P.cpp fastscape_RB+PI.cpp fastscape_RB+PQ.cpp fastscape_RB+GPU.cpp fastscape_BW.hpp fastscape_BW+P.hpp fastscape_BW+PI.hpp fastscape_RB.hpp fastscape_RB+P.hpp fastscape_RB+PI.hpp fastscape_RB+PQ.hpp fastscape_RB+GPU.hpp random.hpp CumulativeTimer.hpp main.cpp
 	echo "\033[91mCompiling 'fastscape_RB+GPU.exe' without OpenACC. No GPU acceleration will be used.\033[39m"
-	$(CXX) $(CFLAGS) $(WARNINGS) -o fastscape_RB+GPU.exe CumulativeTimer.cpp  random.cpp  fastscape_RB+GPU.cpp -Wno-unknown-pragmas -Wno-shadow
+	$(CXX) $(CFLAGS) $(WARNINGS) -o quickscape.exe  main.cpp CumulativeTimer.cpp  random.cpp  fastscape_BW.cpp fastscape_BW+P.cpp fastscape_BW+PI.cpp fastscape_RB.cpp fastscape_RB+P.cpp fastscape_RB+PI.cpp fastscape_RB+PQ.cpp fastscape_RB+GPU.cpp -Wno-unknown-pragmas -fopenmp 
 
 clean:
 	rm -rf *.exe
