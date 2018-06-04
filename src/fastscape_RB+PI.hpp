@@ -13,21 +13,19 @@ class FastScape_RBPI {
   //not flow anywhere.
   const int    NO_FLOW = -1;
   const double SQRT2   = 1.414213562373095048801688724209698078569671875376948; //Yup, this is overkill.
-
+  const double dr[8]   = {1,SQRT2,1,SQRT2,1,SQRT2,1,SQRT2}; //Distance between adjacent cell centers on a rectangular grid arbitrarily scale to cell edge lengths of 1
 
  public:
   //NOTE: Having these constants specified in the class rather than globally
   //results in a significant speed loss. However, it is better to have them here
   //under the assumption that they'd be dynamic in a real implementation.
-  const double keq       = 2e-6;   //Stream power equation constant (coefficient)
-  const double neq       = 2;      //Stream power equation constant (slope modifier)
-  const double meq       = 0.8;    //Stream power equation constant (area modifier)
-  const double ueq       = 2e-3;   //Rate of uplift
-  const double dt        = 1000.;  //Timestep interval
-  const double dr[8]     = {1,SQRT2,1,SQRT2,1,SQRT2,1,SQRT2}; //Distance between adjacent cell centers on a rectangular grid arbitrarily scale to cell edge lengths of 1
-  const double tol       = 1e-3;   //Tolerance for Newton-Rhapson convergence while solving implicit Euler
-  const double cell_area = 40000;  //Area of a single cell
-
+  double keq         = 2e-6;   //Stream power equation constant (coefficient)
+  double neq         = 2;      //Stream power equation constant (slope modifier)
+  double meq         = 0.8;    //Stream power equation constant (area modifier)
+  double ueq         = 2e-3;   //Rate of uplift
+  double dt          = 1000.;  //Timestep interval
+  double tol         = 1e-3;   //Tolerance for Newton-Rhapson convergence while solving implicit Euler
+  double cell_area   = 40000;  //Area of a single cell
 
  private:
   int width;        //Width of DEM
