@@ -3,10 +3,8 @@ COMPILE_TIME=`date -u +'%Y-%m-%d %H:%M:%S UTC'`
 
 .PHONY: all
 
-all: fastscape_RB+GPU.exe
-
-fastscape_RB+GPU.exe: fastscape_RB+GPU.cpp
-	pgc++ -fast -acc -o fastscape_RB+GPU.exe -ta=tesla,pinned,cc60 -Minfo=accel fastscape_RB+GPU.cpp CumulativeTimer.cpp random.cpp -std=c++11 2>&1 -DGIT_HASH="\"$GIT_HASH\"" -DPGI_WAR
+all:
+	pgc++ -g -o fastscape_RB+GPU.exe -ta=tesla,cc60 -Minfo=accel main.cpp CumulativeTimer.cpp  random.cpp  fastscape_BW.cpp fastscape_BW+P.cpp fastscape_BW+PI.cpp fastscape_RB.cpp fastscape_RB+P.cpp fastscape_RB+PI.cpp fastscape_RB+PQ.cpp fastscape_RB+GPU.cpp fastscape_RB+GPU-graph.cpp -std=c++11 -DGIT_HASH="\"$GIT_HASH\"" -DPGI_WAR
 
 clean:
 	rm -rf *.exe

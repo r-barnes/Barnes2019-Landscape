@@ -2,6 +2,7 @@
 #include "fastscape_BW+P.hpp"
 #include "fastscape_BW+PI.hpp"
 #include "fastscape_RB+GPU.hpp"
+#include "fastscape_RB+GPU-graph.hpp"
 #include "fastscape_RB.hpp"
 #include "fastscape_RB+P.hpp"
 #include "fastscape_RB+PI.hpp"
@@ -106,16 +107,17 @@ int main(int argc, char **argv){
   //Random seed used to produce outputs
   std::cout<<"m Random seed = "<<rand_seed<<std::endl;
 
-  if     (model=="BW")     RunModel<FastScape_BW>   (size, nstep, output_name, "fastscape_BW"    );
-  else if(model=="BW+P")   RunModel<FastScape_BWP>  (size, nstep, output_name, "fastscape_BW+P"  );
-  else if(model=="BW+PI")  RunModel<FastScape_BWPI> (size, nstep, output_name, "fastscape_BW+PI" );
-  else if(model=="RB")     RunModel<FastScape_RB>   (size, nstep, output_name, "fastscape_RB"    );
-  else if(model=="RB+P")   RunModel<FastScape_RBP>  (size, nstep, output_name, "fastscape_RB+P"  );
-  else if(model=="RB+PI")  RunModel<FastScape_RBPI> (size, nstep, output_name, "fastscape_RB+PI" );
-  else if(model=="RB+PQ")  RunModel<FastScape_RBPQ> (size, nstep, output_name, "fastscape_RB+PQ" );
-  else if(model=="RB+GPU") RunModel<FastScape_RBGPU>(size, nstep, output_name, "fastscape_RB+GPU");
+  if     (model=="BW")          RunModel<FastScape_BW>   (size, nstep, output_name, "fastscape_BW"    );
+  else if(model=="BW+P")        RunModel<FastScape_BWP>  (size, nstep, output_name, "fastscape_BW+P"  );
+  else if(model=="BW+PI")       RunModel<FastScape_BWPI> (size, nstep, output_name, "fastscape_BW+PI" );
+  else if(model=="RB")          RunModel<FastScape_RB>   (size, nstep, output_name, "fastscape_RB"    );
+  else if(model=="RB+P")        RunModel<FastScape_RBP>  (size, nstep, output_name, "fastscape_RB+P"  );
+  else if(model=="RB+PI")       RunModel<FastScape_RBPI> (size, nstep, output_name, "fastscape_RB+PI" );
+  else if(model=="RB+PQ")       RunModel<FastScape_RBPQ> (size, nstep, output_name, "fastscape_RB+PQ" );
+  else if(model=="RB+GPU")      RunModel<FastScape_RBGPU>(size, nstep, output_name, "fastscape_RB+GPU");
+  else if(model=="RB+GPUgraph") RunModel<FastScape_RBGPUgraph>(size, nstep, output_name, "fastscape_RB+GPUgraph");
   else {
-    std::cerr<<"Unknown model! Choices: BW, BW+P, BW+PI, RB, RB+P, RB+PI, RB+PQ, RB+GPU."<<std::endl;
+    std::cerr<<"Unknown model! Choices: BW, BW+P, BW+PI, RB, RB+P, RB+PI, RB+PQ, RB+GPU, RB+GPUgraph."<<std::endl;
     return -1;
   }
 

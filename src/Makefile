@@ -12,5 +12,8 @@ quickscape.exe: random.cpp CumulativeTimer.cpp fastscape_BW.cpp fastscape_BW+P.c
 	echo "\033[91mCompiling 'fastscape_RB+GPU.exe' without OpenACC. No GPU acceleration will be used.\033[39m"
 	$(CXX) $(CFLAGS) $(WARNINGS) -o quickscape.exe  main.cpp CumulativeTimer.cpp  random.cpp  fastscape_BW.cpp fastscape_BW+P.cpp fastscape_BW+PI.cpp fastscape_RB.cpp fastscape_RB+P.cpp fastscape_RB+PI.cpp fastscape_RB+PQ.cpp fastscape_RB+GPU.cpp -Wno-unknown-pragmas -fopenmp 
 
+pgi:
+	$(CXX) $(CFLAGS) $(WARNINGS) -o quickscape.exe  main.cpp CumulativeTimer.cpp  random.cpp  fastscape_BW.cpp fastscape_BW+P.cpp fastscape_BW+PI.cpp fastscape_RB.cpp fastscape_RB+P.cpp fastscape_RB+PI.cpp fastscape_RB+PQ.cpp fastscape_RB+GPU.cpp -Wno-unknown-pragmas -fopenmp 
+
 clean:
 	rm -rf *.exe
