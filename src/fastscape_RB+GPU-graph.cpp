@@ -282,37 +282,6 @@ void FastScape_RBGPUgraph::ComputeFlowAcc(){
       }
     }
   }
- 
-
-
-
-
-  //Highly-elevated cells pass their flow to less elevated neighbour cells.
-  //The queue is ordered so that higher cells are keyed to higher indices in
-  //the queue; therefore, parsing the queue in reverse ensures that fluid
-  //flows downhill.
-
-  //We can process the cells in each level in parallel. To prevent race
-  //conditions, each focal cell figures out what contirbutions it receives
-  //from its neighbours.
-
-  //nlevel-1 to nlevel:   Doesn't exist, since nlevel is outside the bounds of level
-  //nlevel-2 to nlevel-1: Uppermost heights
-  //nlevel-3 to nlevel-2: Region just below the uppermost heights
-  // #pragma acc parallel default(none) present(this,accum,levels,nshift,rec,stack)
-  // for(int li=nlevel-3;li>=1;li--){
-  //   const int lvlstart = levels[li];      //Starting index of level in stack
-  //   const int lvlend   = levels[li+1];    //Ending index of level in stack
-  //   #pragma acc parallel loop independent default(none) present(this,accum,levels,nshift,rec,stack)
-  //   for(int si=lvlstart;si<lvlend;si++){
-  //     const int c = stack[si];
-  //     #pragma acc loop seq
-  //     for(int k=0;k<ndon[c];k++){
-  //       const auto n = donor[8*c+k];
-  //       accum[c]    += accum[n];
-  //     }
-  //   }
-  // }    
 }
 
 
@@ -369,7 +338,8 @@ void FastScape_RBGPUgraph::Erode(){
     }
   }
 
-  // std::cout<<"\tloopy loopy"<<std::endl;
+  //Loop only if keep_going>0. This indicates that new cells have been added to
+  //the next frontier of the breadth-first search.
   int keep_going = 1;
   while(keep_going>0){
     // std::cout<<"\t\tPush around"<<std::endl;
@@ -425,40 +395,6 @@ void FastScape_RBGPUgraph::Erode(){
       }
     }
   }
- 
-
-
-  // //The cells in each level can be processed in parallel, so we loop over
-  // //levels starting from the lower-most (the one closest to the NO_FLOW cells)
-
-  // //Level 0 contains all those cells which do not flow anywhere, so we skip it
-  // //since their elevations will not be changed via erosion anyway.
-  // // #pragma acc parallel default(none) present(this,levels,stack,nshift,rec,accum,h)
-  // for(int li=1;li<nlevel-1;li++){
-  //   const int lvlstart = levels[li];      //Starting index of level in stack
-  //   const int lvlend   = levels[li+1];    //Ending index of level in stack
-  //   #pragma acc parallel loop independent default(none) present(this,levels,stack,nshift,rec,accum,h)
-  //   for(int si=lvlstart;si<lvlend;si++){
-  //     const int c = stack[si];         //Cell from which flow originates
-  //     const int n = c+nshift[rec[c]];  //Cell receiving the flow
-
-  //     const double length = dr[rec[c]];
-  //     //`fact` contains a set of values which are constant throughout the integration
-  //     const double fact   = keq*dt*std::pow(accum[c],meq)/std::pow(length,neq);
-  //     const double h0     = h[c];      //Elevation of focal cell
-  //     const double hn     = h[n];      //Elevation of neighbouring (receiving, lower) cell
-  //     double hnew         = h0;        //Current updated value of focal cell
-  //     double hp           = h0;        //Previous updated value of focal cell
-  //     double diff         = 2*tol;     //Difference between current and previous updated values
-  //     #pragma acc loop seq
-  //     while(std::abs(diff)>tol){       //Newton-Rhapson method (run until subsequent values differ by less than a tolerance, which can be set to any desired precision)
-  //       hnew -= (hnew-h0+fact*std::pow(hnew-hn,neq))/(1.+fact*neq*std::pow(hnew-hn,neq-1));
-  //       diff  = hnew - hp;             //Difference between previous and current value of the iteration
-  //       hp    = hnew;                  //Update previous value to new value
-  //     }
-  //     h[c] = hnew;                     //Update value in array
-  //   }
-  // }
 }
 
 
