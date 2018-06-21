@@ -73,6 +73,7 @@ void RunModel(const int size, const int nstep, const std::string output_name, co
   CumulativeTimer tmr(true);
   T tm(size,size);
 
+  std::cout<<"Generating terrain..."<<std::endl;
   CumulativeTimer tmr_rand_gen(true);
   GenerateRandomTerrain(tm.getH(), size, size);
   tmr_rand_gen.stop();

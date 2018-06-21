@@ -4,7 +4,7 @@
 #include <iostream>
 #include "random.hpp"
 #include <vector>
-#include "fastscape_RB+GPU.hpp"
+#include "fastscape_RB+GPU-openmp.hpp"
 
 #ifndef _OPENMP
   #define omp_get_team_num() 0
@@ -171,9 +171,6 @@ void FastScape_RBGPU::GenerateOrder(){
 
   //Start with level_bottom=-1 so we get into the loop, it is immediately
   //replaced by level_top.
-  // int level_bottom = -1;         //First cell of the current level
-  // int level_top    =  0;         //Last cell of the current level
-
 
     int level_bottom  = -1;         //First cell of the current level
     int level_top     = 0;         //Last cell of the current level
@@ -255,8 +252,7 @@ void FastScape_RBGPU::AddUplift(){
   const int height = this->height;
   const int width  = this->width;
 
-  #pragma omp target teams
-  #pragma omp distribute parallel for simd default(none)
+  #pragma omp target teams distribute parallel for simd collapse(2) default(none) schedule(static,1)
   for(int y=2;y<height-2;y++)
   for(int x=2;x<width-2;x++){
     const int c = y*width+x;
