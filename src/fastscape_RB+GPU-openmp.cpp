@@ -118,106 +118,47 @@ void FastScape_RBGPU::GenerateOrder(){
   const int height = this->height;
   const int width  = this->width;
 
+  #pragma omp target teams num_teams(thread_count) thread_limit(1)
+  {
+    auto &tnlevel = nlevel[omp_get_team_num()];
+    auto &tnstack = nstack[omp_get_team_num()];
+    auto *tlevels = &levels[omp_get_team_num()*level_width];
+    auto *tstack  = &stack [omp_get_team_num()*stack_width];
 
+    //TODO: We may not need to do this
+    #pragma omp distribute parallel for simd default(none)
+    for(int i=0;i<thread_count*stack_width;i++)
+      stack[i] = -1;
+    #pragma omp distribute parallel for simd default(none)
+    for(int i=0;i<thread_count*level_width;i++)
+      levels[i] = -1;
 
-  std::cout<<"\tStack reset"<<std::endl;
-
-  //TODO: Do we need to reset memory?
-  #pragma omp target teams default(none)
-  #pragma omp distribute parallel for simd default(none)
-  for(int i=0;i<thread_count*stack_width;i++)
-    stack[i] = -1;
-
-  std::cout<<"\tLevels reset"<<std::endl;
-
-  #pragma omp target teams
-  #pragma omp distribute parallel for simd default(none)
-  for(int i=0;i<thread_count*level_width;i++)
-    levels[i] = -1;
-
-  std::cout<<"\t init"<<std::endl;
-
-  #pragma omp target teams num_teams(thread_count)
-  {auto &tnlevel = nlevel[omp_get_team_num()];auto &tnstack = nstack[omp_get_team_num()];auto *tlevels = &levels[omp_get_team_num()*level_width];auto *tstack  = &stack [omp_get_team_num()*stack_width];
-
-    // #pragma omp parallel shared(tlevels,tnlevel,tnstack)
-    // {
-      tlevels[0] = 0;
-      tnlevel    = 1;
-      tnstack    = 0;
-    // }
-  }
-
-  // #pragma omp target update from(nstack[0:thread_count],nlevel[0:thread_count])
-  // std::cout<<"init:"<<std::endl;
-  // std::cout<<"nstack:   "; for(int i=0;i<thread_count;i++) std::cout<<nstack[i]<<" "; std::cout<<std::endl;
-  // std::cout<<"nlevel:   "; for(int i=0;i<thread_count;i++) std::cout<<nlevel[i]<<" "; std::cout<<std::endl;
-
-  #pragma omp target teams num_teams(thread_count)
-  {auto &tnlevel = nlevel[omp_get_team_num()];auto &tnstack = nstack[omp_get_team_num()];auto *tlevels = &levels[omp_get_team_num()*level_width];auto *tstack  = &stack [omp_get_team_num()*stack_width];
+    tlevels[0] = 0;
+    tnlevel    = 1;
+    tnstack    = 0;
 
     #pragma omp distribute
     for(int y=1;y<height-1;y++){
       tstack[tnstack++] = y*width+1;          
       tstack[tnstack++] = y*width+(width-2);  
     }
-  }
-
-  // #pragma omp target update from(nstack[0:thread_count],nlevel[0:thread_count])
-  // std::cout<<"y:"<<std::endl;
-  // std::cout<<"nstack:   "; for(int i=0;i<thread_count;i++) std::cout<<nstack[i]<<" "; std::cout<<std::endl;
-  // std::cout<<"nlevel:   "; for(int i=0;i<thread_count;i++) std::cout<<nlevel[i]<<" "; std::cout<<std::endl;
-
-
-  #pragma omp target teams num_teams(thread_count)
-  {auto &tnlevel = nlevel[omp_get_team_num()];auto &tnstack = nstack[omp_get_team_num()];auto *tlevels = &levels[omp_get_team_num()*level_width];auto *tstack  = &stack [omp_get_team_num()*stack_width];
 
     #pragma omp distribute
     for(int x=2;x<width-2;x++){
       tstack[tnstack++] =          1*width+x; 
       tstack[tnstack++] = (height-2)*width+x; 
     }
-  }
 
-  //   #pragma omp target update from(nstack[0:thread_count],nlevel[0:thread_count])
-  // std::cout<<"x:"<<std::endl;
-  // std::cout<<"nstack:   "; for(int i=0;i<thread_count;i++) std::cout<<nstack[i]<<" "; std::cout<<std::endl;
-  // std::cout<<"nlevel:   "; for(int i=0;i<thread_count;i++) std::cout<<nlevel[i]<<" "; std::cout<<std::endl;
-
-
-  // #pragma omp target teams num_teams(thread_count)
-  // {auto &tnlevel = nlevel[omp_get_team_num()];auto &tnstack = nstack[omp_get_team_num()];auto *tlevels = &levels[omp_get_team_num()*level_width];auto *tstack  = &stack [omp_get_team_num()*stack_width];
-
-  //   #pragma omp distribute parallel for collapse(2) num_threads(1) shared(tstack,tnstack)
-  //   for(int y=2;y<height-2;y++)
-  //   for(int x=2;x<width -2;x++){
-  //     const int c = y*width+x;
-  //     if(rec[c]==NO_FLOW){
-  //       tstack[tnstack++] = c;                
-  //     }
-  //   }
-  // }
-
-  //   #pragma omp target update from(nstack[0:thread_count],nlevel[0:thread_count])
-  // std::cout<<"interior:"<<std::endl;
-  // std::cout<<"nstack:   "; for(int i=0;i<thread_count;i++) std::cout<<nstack[i]<<" "; std::cout<<std::endl;
-  // std::cout<<"nlevel:   "; for(int i=0;i<thread_count;i++) std::cout<<nlevel[i]<<" "; std::cout<<std::endl;
-
-
-  #pragma omp target teams num_teams(thread_count)
-  {auto &tnlevel = nlevel[omp_get_team_num()];auto &tnstack = nstack[omp_get_team_num()];auto *tlevels = &levels[omp_get_team_num()*level_width];auto *tstack  = &stack [omp_get_team_num()*stack_width];
+    #pragma omp distribute collapse(2)
+    for(int y=2;y<height-2;y++)
+    for(int x=2;x<width -2;x++){
+      const int c = y*width+x;
+      if(rec[c]==NO_FLOW){
+        tstack[tnstack++] = c;                
+      }
+    }
 
     tlevels[tnlevel++] = tnstack; //Last cell of this level
-  }
-
-  //   #pragma omp target update from(nstack[0:thread_count],nlevel[0:thread_count],stack[0:thread_count*stack_width])
-  // std::cout<<"lastlevel:"<<std::endl;
-  // std::cout<<"nstack:   "; for(int i=0;i<thread_count;i++) std::cout<<nstack[i]<<" "; std::cout<<std::endl;
-  // std::cout<<"nlevel:   "; for(int i=0;i<thread_count;i++) std::cout<<nlevel[i]<<" "; std::cout<<std::endl;
-
-  // std::cout<<"stack:   "; for(int i=0;i<thread_count*stack_width;i++) std::cout<<(int)stack[i]<<"|"; std::cout<<std::endl;
-
-
 
   //Interior cells
   //TODO: Outside edge is always NO_FLOW. Maybe this can get loaded once?
@@ -228,23 +169,12 @@ void FastScape_RBGPU::GenerateOrder(){
 
   // #pragma acc update host(stack[0:5*size],nstack[0:thread_count],levels[0:size],nlevel[0:thread_count])
 
-  // std::cout<<"stacknum: "; for(int i=0;i<5*size;i++)       std::cout<<stack_num[i]<<" "; std::cout<<std::endl;
-  // std::cout<<"stack:    "; for(int i=0;i<5*size;i++)       std::cout<<stack[i] <<" "; std::cout<<std::endl;
-  // std::cout<<"levels:   "; for(int i=0;i<size;i++)         std::cout<<levels[i]<<" "; std::cout<<std::endl;
-
   //Start with level_bottom=-1 so we get into the loop, it is immediately
   //replaced by level_top.
   // int level_bottom = -1;         //First cell of the current level
   // int level_top    =  0;         //Last cell of the current level
 
-  std::cout<<"\t build inwards"<<std::endl;
 
-  #pragma omp target teams num_teams(thread_count) //num_threads(1)
-      {
-    auto &tnlevel = nlevel[omp_get_team_num()];
-    auto &tnstack = nstack[omp_get_team_num()];
-    auto *tlevels = &levels[omp_get_team_num()*level_width];
-    auto *tstack  = &stack [omp_get_team_num()*stack_width];
     int level_bottom  = -1;         //First cell of the current level
     int level_top     = 0;         //Last cell of the current level
 
@@ -253,21 +183,16 @@ void FastScape_RBGPU::GenerateOrder(){
       level_top    = tnstack;       //The new top is the end of the stack (last cell added from the previous level)
       for(int si=level_bottom;si<level_top;si++){
         const auto c = tstack[si];
-      //Load donating neighbours of focal cell into the stack
-      for(int k=0;k<ndon[c];k++){
+        //Load donating neighbours of focal cell into the stack
+        for(int k=0;k<ndon[c];k++){
           const auto n = donor[8*c+k];
           tstack[tnstack++] = n;
+        }
       }
-    }
 
       tlevels[tnlevel++] = tnstack; //Start a new level
     }
-  }
 
-  std::cout<<"\t finalize"<<std::endl;
-
-    #pragma omp target teams num_teams(thread_count) //num_threads(1)
-  {
     nlevel[omp_get_team_num()]--;
   }
 }
@@ -424,6 +349,7 @@ void FastScape_RBGPU::run(const int nstep){
   for(int i=0;i<size;i++)
     ndon[i] = 0;
 
+  std::cout<<"Transferring memory..."<<std::endl;
   #pragma omp target enter data           \
     map(to:                               \
       this[0:1],                          \
@@ -466,12 +392,12 @@ void FastScape_RBGPU::run(const int nstep){
     #pragma omp master
     if( step%1==0 ) //Show progress
       std::cout<<"p Step = "<<step<<std::endl;
-    std::cout<<"ComputeReceivers"<<std::endl;        Tmr_Step2_DetermineReceivers.start ();   ComputeReceivers  ();  Tmr_Step2_DetermineReceivers.stop ();
-    std::cout<<"ComputeDonors"<<std::endl;        Tmr_Step3_DetermineDonors.start    ();   ComputeDonors     ();  Tmr_Step3_DetermineDonors.stop    ();
-    std::cout<<"GenerateOrder"<<std::endl;        Tmr_Step4_GenerateOrder.start      ();   GenerateOrder     ();  Tmr_Step4_GenerateOrder.stop      ();
-    std::cout<<"ComputeFlowAcc"<<std::endl;        Tmr_Step5_FlowAcc.start            ();   ComputeFlowAcc    ();  Tmr_Step5_FlowAcc.stop            ();
-    std::cout<<"AddUplift"<<std::endl;        Tmr_Step6_Uplift.start             ();   AddUplift         ();  Tmr_Step6_Uplift.stop             ();
-    std::cout<<"Erode"<<std::endl;        Tmr_Step7_Erosion.start            ();   Erode             ();  Tmr_Step7_Erosion.stop            ();
+    Tmr_Step2_DetermineReceivers.start ();   ComputeReceivers  ();  Tmr_Step2_DetermineReceivers.stop ();
+    Tmr_Step3_DetermineDonors.start    ();   ComputeDonors     ();  Tmr_Step3_DetermineDonors.stop    ();
+    Tmr_Step4_GenerateOrder.start      ();   GenerateOrder     ();  Tmr_Step4_GenerateOrder.stop      ();
+    Tmr_Step5_FlowAcc.start            ();   ComputeFlowAcc    ();  Tmr_Step5_FlowAcc.stop            ();
+    Tmr_Step6_Uplift.start             ();   AddUplift         ();  Tmr_Step6_Uplift.stop             ();
+    Tmr_Step7_Erosion.start            ();   Erode             ();  Tmr_Step7_Erosion.stop            ();
   }
 
   Tmr_Overall.stop();

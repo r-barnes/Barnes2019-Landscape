@@ -63,7 +63,7 @@ class FastScape_RBGPU {
   int    *nlevel;    //Number of levels used
   int    *nstack;
 
-  const int thread_count = 1000;
+  const int thread_count = 10000;
 
   //Timers for keeping track of how long each part of the code takes
   CumulativeTimer Tmr_Step1_Initialize;
