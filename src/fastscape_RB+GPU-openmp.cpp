@@ -10,6 +10,14 @@
   #define omp_get_team_num() 0
 #endif
 
+
+int GetLog2(const int N){
+  int k=1;
+  int s=0;
+  for(k=1;k<N;k<<=1,s++) {}
+  return s;
+}
+
 ///Initializing code
 FastScape_RBGPU::FastScape_RBGPU(const int width0, const int height0)
   //Initialize code for finding neighbours of a cell
@@ -23,6 +31,23 @@ FastScape_RBGPU::FastScape_RBGPU(const int width0, const int height0)
 
   h      = new double[size];
 
+  edge_indices_max = 2*(width-2)+2*(height-2)-4;
+  edge_indices     = new int[edge_indices_max];
+
+  //Add indices of edge cells to `edge_indices` array looping from the upper
+  //left corner clockwise. This preserves spatial contiguity.
+  edge_indices_size = 0;
+  for(int x=1;x<width-1;x++)                        //Top edge
+    edge_indices[edge_indices_size++] = 1*width+x;
+  for(int y=2;y<height-2;y++)                     //Right edge
+    edge_indices[edge_indices_size++] = y*width+(width-2);
+  for(int x=width-2;x>=1;x--)                     //Bottom edge
+    edge_indices[edge_indices_size++] = (height-2)*width+x;
+  for(int y=height-3;y>=2;y--)                    //Left edge
+    edge_indices[edge_indices_size++] = y*width+1;
+
+  assert(edge_indices_size<=edge_indices_max);
+
   Tmr_Step1_Initialize.stop();
   Tmr_Overall.stop();
 }
@@ -32,6 +57,32 @@ FastScape_RBGPU::FastScape_RBGPU(const int width0, const int height0)
 FastScape_RBGPU::~FastScape_RBGPU(){
   delete[] h;
 }
+
+
+
+void FastScape_RBGPU::PrefixSumExclusive(const int n){
+  const int lg2n = GetLog2(n);
+
+  if((1<<lg2n)>frontier_width)
+    throw std::runtime_error("Position array length must be less than POS_MAX!");
+
+  //Up-Sweep
+  for (int d=1; d<=lg2n; d++) {
+    const int step = 1<<d;
+    #pragma omp target teams distribute parallel for simd //num_teams(65536) thread_limit(512)
+    for (int k=step-1; k<n; k+=step)
+      stack_pos[k] += stack_pos[k-step/2];
+  }
+
+  //Down-Sweep
+  for (int d=lg2n-1; d>0; d--){
+    const int step = 1<<d;
+    #pragma omp target teams distribute parallel for simd //thread_limit(d)
+    for (int k=step-1; k<n-step/2; k+=step) 
+      stack_pos[k+step/2] += stack_pos[k];
+  }
+}
+
 
 
 ///The receiver of a focal cell is the cell which receives the focal cells'
@@ -72,8 +123,6 @@ void FastScape_RBGPU::ComputeReceivers(){
 ///The donors of a focal cell are the neighbours from which it receives flow.
 ///Here, we identify those neighbours by inverting the Receivers array.
 void FastScape_RBGPU::ComputeDonors(){
-  const int height = this->height;
-  const int width  = this->width;
   //The B&W method of developing the donor array has each focal cell F inform
   //its receiving cell R that F is a donor of R. Unfortunately, parallelizing
   //this is difficult because more than one cell might be informing R at any
@@ -87,8 +136,7 @@ void FastScape_RBGPU::ComputeDonors(){
   //Remember, the outermost ring of cells is a convenience halo, so we don't
   //calculate donors for it.
 
-  #pragma omp target teams
-  #pragma omp distribute parallel for simd collapse(2) default(none)
+  #pragma omp target teams distribute parallel for simd collapse(2) default(none)
   for(int y=1;y<height-1;y++)
   for(int x=1;x<width-1;x++){
     const int c = y*width+x;
@@ -115,83 +163,130 @@ void FastScape_RBGPU::ComputeDonors(){
 ///race conditions.
 void FastScape_RBGPU::GenerateOrder(){
 //  #pragma omp target update from(rec[0:size],donor[0:8*size],ndon[0:size])
-  const int height = this->height;
-  const int width  = this->width;
+  //TODO: REMOVE
+  // #pragma omp target teams distribute parallel for simd 
+  // for(int i=0;i<stack_width;i++)
+  //   stack[i] = -3;
 
-  #pragma omp target teams num_teams(thread_count) thread_limit(1)
-  {
-    auto &tnlevel = nlevel[omp_get_team_num()];
-    auto &tnstack = nstack[omp_get_team_num()];
-    auto *tlevels = &levels[omp_get_team_num()*level_width];
-    auto *tstack  = &stack [omp_get_team_num()*stack_width];
+  #pragma omp target teams distribute parallel for simd
+  for(int i=0;i<edge_indices_size;i++)
+    stack[i] = edge_indices[i];
 
-    //TODO: We may not need to do this
-    #pragma omp distribute parallel for simd default(none)
-    for(int i=0;i<thread_count*stack_width;i++)
-      stack[i] = -1;
-    #pragma omp distribute parallel for simd default(none)
-    for(int i=0;i<thread_count*level_width;i++)
-      levels[i] = -1;
 
-    tlevels[0] = 0;
-    tnlevel    = 1;
-    tnstack    = 0;
+  // for(int i=0;i<stack_width;i++)
+  //   std::cout<<stack[i]<<" ";
+  // std::cout<<std::endl;
 
-    #pragma omp distribute
-    for(int y=1;y<height-1;y++){
-      tstack[tnstack++] = y*width+1;          
-      tstack[tnstack++] = y*width+(width-2);  
-    }
+  // #pragma omp distribute collapse(2)
+  // for(int y=2;y<height-2;y++)
+  // for(int x=2;x<width -2;x++){
+  //   const int c = y*width+x;
+  //   if(rec[c]==NO_FLOW){
+  //     tstack[tnstack++] = c;                
+  //   }
+  // }
 
-    #pragma omp distribute
-    for(int x=2;x<width-2;x++){
-      tstack[tnstack++] =          1*width+x; 
-      tstack[tnstack++] = (height-2)*width+x; 
-    }
+  levels[0] = 0;
+  nlevel    = 1;
 
-    #pragma omp distribute collapse(2)
-    for(int y=2;y<height-2;y++)
-    for(int x=2;x<width -2;x++){
-      const int c = y*width+x;
-      if(rec[c]==NO_FLOW){
-        tstack[tnstack++] = c;                
-      }
-    }
-
-    tlevels[tnlevel++] = tnstack; //Last cell of this level
+  nstack           = edge_indices_size;
+  levels[nlevel++] = edge_indices_size; //Last cell of this level
 
   //Interior cells
   //TODO: Outside edge is always NO_FLOW. Maybe this can get loaded once?
   //Load cells without dependencies into the queue
   //TODO: Why can't I use nowait here?
 
+    // #pragma omp target update from(stack[0:stack_width])
+    // std::cout<<"base stack: ";
+    // for(int i=0;i<nstack;i++)
+    //   std::cout<<stack[i]<<" ";
+    // std::cout<<std::endl;
 
 
   // #pragma acc update host(stack[0:5*size],nstack[0:thread_count],levels[0:size],nlevel[0:thread_count])
 
   //Start with level_bottom=-1 so we get into the loop, it is immediately
   //replaced by level_top.
-
-    int level_bottom  = -1;         //First cell of the current level
-    int level_top     = 0;         //Last cell of the current level
-
-    while(level_bottom<level_top){ //Ensure we parse all the cells
-      level_bottom = level_top;    //The top of the previous level we considered is the bottom of the current level
-      level_top    = tnstack;       //The new top is the end of the stack (last cell added from the previous level)
-      for(int si=level_bottom;si<level_top;si++){
-        const auto c = tstack[si];
-        //Load donating neighbours of focal cell into the stack
-        for(int k=0;k<ndon[c];k++){
-          const auto n = donor[8*c+k];
-          tstack[tnstack++] = n;
-        }
-      }
-
-      tlevels[tnlevel++] = tnstack; //Start a new level
+  int level_bottom  = 0;         //First cell of the current level
+  int level_top     = nstack;    //Last cell of the current level
+  while(level_bottom<level_top){  //Ensure we parse all the cells
+    const int lvlsize = level_top-level_bottom;
+    //Load donating neighbours of focal cell into the stack
+    #pragma omp target teams distribute parallel for simd collapse(2)
+    for(int si=level_bottom;si<level_top;si++)
+    for(int k=0;k<8;k++){
+      const auto c = stack[si];
+      const auto fpos = si-level_bottom;
+      if(k<ndon[c])
+        frontier[8*fpos+k] = donor[8*c+k];
+      else
+        frontier[8*fpos+k] = -1;
     }
 
-    nlevel[omp_get_team_num()]--;
+    // #pragma omp target update from(frontier[0:frontier_width])
+    // std::cout<<"Frontier (Level="<<level_bottom<<"-"<<level_top<<"): ";
+    // for(int i=0;i<8*lvlsize;i++)
+    //   std::cout<<frontier[i]<<" ";
+    // std::cout<<std::endl;
+
+    #pragma omp target teams distribute parallel for simd
+    for(int i=0;i<8*lvlsize;i++)
+      stack_pos[i] = (frontier[i]!=-1);
+
+    // #pragma omp target update from(stack_pos[0:frontier_width])
+    // std::cout<<"stack_pos ones (Level="<<level_bottom<<"-"<<level_top<<"): ";
+    // for(int i=0;i<8*lvlsize;i++)
+    //   std::cout<<stack_pos[i]<<" ";
+    // std::cout<<std::endl;
+
+    PrefixSumExclusive(8*lvlsize);
+
+    // #pragma omp target update from(stack_pos[0:frontier_width])
+    // std::cout<<"stack_pos prsu (Level="<<level_bottom<<"-"<<level_top<<"): ";
+    // for(int i=0;i<8*lvlsize;i++)
+    //   std::cout<<stack_pos[i]<<" ";
+    // std::cout<<std::endl;
+
+    volatile int bob = nstack;
+
+    // std::cout<<"nstack = "<<nstack<<std::endl;
+    #pragma omp target teams distribute parallel for simd //default(none) firstprivate(nstack)
+    for(int i=0;i<8*lvlsize;i++)
+      if(frontier[i]!=-1)
+        stack[bob+stack_pos[i]-1] = frontier[i]; //Using stack_pos[i]-1 copies to the correct location. Why does adding nstack result in failure?
+
+    // std::cout<<"Copied = "<<copied<<std::endl;
+
+    #pragma omp target update from(stack_pos[8*lvlsize-1:8*lvlsize])
+
+    nstack          += stack_pos[8*lvlsize-1];
+    levels[nlevel++] = nstack; //Start a new level
+
+    // #pragma omp target update from(stack[0:stack_width])
+    // std::cout<<"stack grow: ";
+    // for(int i=0;i<nstack;i++)
+    //   std::cout<<stack[i]<<" ";
+    // std::cout<<std::endl;
+
+
+    level_bottom = level_top;     //The top of the previous level we considered is the bottom of the current level
+    level_top    = nstack;        //The new top is the end of the stack (last cell added from the previous level)    
   }
+
+  nlevel--;
+
+  // std::cout<<"\tnlevel: "<<nlevel<<std::endl;
+  // std::cout<<"\tnstack: "<<nstack<<std::endl;
+  // #pragma omp target update from(stack[0:stack_width])
+  // std::cout<<"stack: ";
+  // for(int i=0;i<nstack;i++)
+  //   std::cout<<stack[i]<<" ";
+  // std::cout<<std::endl;
+  // std::cout<<"level: ";
+  // for(int i=0;i<nlevel;i++)
+  //   std::cout<<levels[i]<<" ";
+  // std::cout<<std::endl;
 }
 
 ///Compute the flow accumulation for each cell: the number of cells whose flow
@@ -219,23 +314,17 @@ void FastScape_RBGPU::ComputeFlowAcc(){
   //nlevel-2 to nlevel-1: Uppermost heights
   //nlevel-3 to nlevel-2: Region just below the uppermost heights
   // #pragma acc parallel default(none) present(this,accum,levels,nshift,rec,stack)
-  #pragma omp target teams num_teams(thread_count)
-  {
-    auto &tnlevel = nlevel[omp_get_team_num()];
-    auto *tlevels = &levels[omp_get_team_num()*level_width];
-    auto *tstack  = &stack [omp_get_team_num()*stack_width];
-    for(int li=tnlevel-3;li>=1;li--){
-      const int lvlstart = tlevels[li];      //Starting index of level in stack
-      const int lvlend   = tlevels[li+1];    //Ending index of level in stack
-      #pragma omp parallel for simd default(none) shared(tstack)
-      for(int si=lvlstart;si<lvlend;si++){
-        const int c = tstack[si];
-        for(int k=0;k<ndon[c];k++){
-          const auto n = donor[8*c+k];
-          accum[c]    += accum[n];
-        }
+  for(int li=nlevel-3;li>=1;li--){
+    const int lvlstart = levels[li];      //Starting index of level in stack
+    const int lvlend   = levels[li+1];    //Ending index of level in stack
+    #pragma omp target teams distribute parallel for simd
+    for(int si=lvlstart;si<lvlend;si++){
+      const int c = stack[si];
+      for(int k=0;k<ndon[c];k++){
+        const auto n = donor[8*c+k];
+        accum[c]    += accum[n];
       }
-    }    
+    }
   }
 }
 
@@ -275,17 +364,12 @@ void FastScape_RBGPU::Erode(){
   //Level 0 contains all those cells which do not flow anywhere, so we skip it
   //since their elevations will not be changed via erosion anyway.
   // #pragma acc parallel default(none) present(this,levels,stack,nshift,rec,accum,h)
-  #pragma omp target teams num_teams(thread_count)
-  {
-    auto &tnlevel = nlevel[omp_get_team_num()];
-    auto *tlevels = &levels[omp_get_team_num()*level_width];
-    auto *tstack  = &stack [omp_get_team_num()*stack_width];  
-  for(int li=1;li<tnlevel-1;li++){
-    const int lvlstart = tlevels[li];      //Starting index of level in stack
-    const int lvlend   = tlevels[li+1];    //Ending index of level in stack
-    #pragma omp parallel for simd default(none) shared(tstack)
+  for(int li=1;li<nlevel-1;li++){
+    const int lvlstart = levels[li];      //Starting index of level in stack
+    const int lvlend   = levels[li+1];    //Ending index of level in stack
+    #pragma omp target teams distribute parallel for simd default(none)
     for(int si=lvlstart;si<lvlend;si++){
-      const int c = tstack[si];         //Cell from which flow originates
+      const int c = stack[si];        //Cell from which flow originates
       const int n = c+nshift[rec[c]];  //Cell receiving the flow
 
       const double length = dr[rec[c]];
@@ -304,7 +388,6 @@ void FastScape_RBGPU::Erode(){
       h[c] = hnew;                     //Update value in array
     }
   }
-}
 }
 
 
@@ -326,15 +409,22 @@ void FastScape_RBGPU::run(const int nstep){
   ndon   = new int[size];
   donor  = new int[8*size];
 
-  nlevel = new int[thread_count];
-  nstack = new int[thread_count];
+  frontier_width = 4*8*(2*width+2*height);
+  frontier_width = 1<<GetLog2(frontier_width); //Ensure frontier is sized to a power of 2
+  frontier       = new int[frontier_width];
+
+  // nlevel = new int[thread_count];
+  // nstack = new int[thread_count];
 
   //TODO: Make smaller, explain max
-  stack_width = std::max(100,10*size/thread_count); //Number of stack entries available to each thread
-  level_width = std::max(1000,size/thread_count);     //Number of level entries available to each thread
+  // stack_width = std::max(100,10*size/thread_count); //Number of stack entries available to each thread
+  // level_width = std::max(1000,size/thread_count);     //Number of level entries available to each thread
+  stack_width    = size;
+  level_width    = 2*width+2*height;
 
-  stack  = new int[thread_count*stack_width];
-  levels = new int[thread_count*level_width];
+  stack         = new int[stack_width];
+  levels        = new int[level_width];
+  stack_pos     = new int[frontier_width];
 
   //! initializing rec
   //#pragma acc parallel loop present(this,rec)
@@ -346,29 +436,29 @@ void FastScape_RBGPU::run(const int nstep){
     ndon[i] = 0;
 
   std::cout<<"Transferring memory..."<<std::endl;
-  #pragma omp target enter data           \
-    map(to:                               \
-      this[0:1],                          \
-      h[0:size],                          \
-      nshift[0:8],                        \
-      rec[0:size],                        \
-      ndon[0:size]                        \
-    )                                     \
-    map(alloc:                            \
-      accum[0:size],                      \
-      donor[0:8*size],                    \
-      stack[0:thread_count*stack_width],  \
-      levels[0:thread_count*level_width], \
-      nlevel[0:thread_count],             \
-      nstack[0:thread_count]              \
+  #pragma omp target enter data          \
+    map(to:                              \
+      this[0:1],                         \
+      h[0:size],                         \
+      nshift[0:8],                       \
+      rec[0:size],                       \
+      ndon[0:size],                      \
+      edge_indices[0:edge_indices_max],  \
+      frontier[0:frontier_width],        \
+      stack_pos[0:frontier_width]        \
+    )                                    \
+    map(alloc:                           \
+      accum[0:size],                     \
+      donor[0:8*size],                   \
+      stack[0:stack_width]               \
     )
 
 
-  std::cout<<"stack_width = "<<stack_width<<std::endl;
-  std::cout<<"level_width = "<<level_width<<std::endl;
+  // std::cout<<"stack_width = "<<stack_width<<std::endl;
+  // std::cout<<"level_width = "<<level_width<<std::endl;
 
-  std::cout<<"stack size = "<<(thread_count*stack_width)<<std::endl;
-  std::cout<<"level size = "<<(thread_count*level_width)<<std::endl;
+  // std::cout<<"stack size = "<<(thread_count*stack_width)<<std::endl;
+  // std::cout<<"level size = "<<(thread_count*level_width)<<std::endl;
 
 
   //TODO: ADJUST THE FOLLOWING
@@ -407,9 +497,19 @@ void FastScape_RBGPU::run(const int nstep){
   std::cout<<"t Step7: Erosion            = "<<std::setw(15)<<Tmr_Step7_Erosion.elapsed()            <<" microseconds"<<std::endl;              
   std::cout<<"t Overall                   = "<<std::setw(15)<<Tmr_Overall.elapsed()                  <<" microseconds"<<std::endl;        
 
-  #pragma omp target exit data map(from:h[0:size]) map(delete:this[0:1],accum[0:size],rec[0:size],ndon[0:size],donor[0:8*size],stack[0:thread_count*stack_width],nlevel,levels[0:thread_count*level_width])
-
-  #pragma omp target exit data map(delete:stack[0:thread_count*stack_width],levels[0:thread_count*level_width],nlevel[0:thread_count],nstack[0:thread_count])
+  #pragma omp target exit data \
+    map(from:h[0:size]) \
+    map(delete:         \
+      this[0:1],        \
+      accum,            \
+      rec,              \
+      ndon,             \
+      donor,            \
+      stack,            \
+      edge_indices,     \
+      frontier,         \
+      stack_pos         \
+    )
 
   //Free up memory, except for the resulting landscape height field prior to
   //exiting so that unnecessary space is not used when the model is not being
@@ -420,8 +520,9 @@ void FastScape_RBGPU::run(const int nstep){
   delete[] stack;
   delete[] donor;
   delete[] levels;
-  delete[] nlevel;
-  delete[] nstack;
+  delete[] edge_indices;
+  delete[] frontier;
+  delete[] stack_pos;
 }
 
 

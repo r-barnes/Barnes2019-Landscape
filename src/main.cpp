@@ -83,7 +83,7 @@ void RunModel(const int size, const int nstep, const std::string output_name, co
   std::cout<<"t Terrain generation time   = "<<std::setw(15)<<tmr_rand_gen.elapsed()<<" microseconds"<<std::endl;
   std::cout<<"t Total calculation time    = "<<std::setw(15)<<tmr.elapsed()         <<" microseconds"<<std::endl;
 
-  PrintDEM(output_name, tm.getH(), size, size);
+  // PrintDEM(output_name, tm.getH(), size, size);
 }
 
 

@@ -48,7 +48,16 @@ class FastScape_RBGPU {
   int    *rec;      //Index of receiving cell
   int    *donor;    //Indices of a cell's donor cells
   int    *ndon;     //How many donors a cell has
-  int    *stack;    //Indices of cells in the order they should be processed
+  int    *frontier; //Indices of cells in the order they should be processed
+  int    *stack;
+
+  int    *edge_indices;
+  int edge_indices_size;
+  int edge_indices_max;
+
+  int *stack_pos;
+
+  int frontier_width;
 
   int stack_width;  //Number of cells allowed in the stack
   int level_width;  //Number of cells allowed in a level
@@ -60,10 +69,10 @@ class FastScape_RBGPU {
   //each other in a topological sorting, but are the same number of steps from
   //the edge of the dataset.
   int    *levels;   //Indices of locations in stack where a level begins and ends
-  int    *nlevel;    //Number of levels used
-  int    *nstack;
+  int    nlevel;    //Number of levels used
+  int    nstack;
 
-  const int thread_count = 10000;
+  // const int thread_count = 10000;
 
   //Timers for keeping track of how long each part of the code takes
   CumulativeTimer Tmr_Step1_Initialize;
@@ -99,6 +108,8 @@ class FastScape_RBGPU {
   ///level can all be processed simultaneously without having to worry about
   ///race conditions.
   void GenerateOrder();
+
+  void PrefixSumExclusive(const int n);
 
   ///Compute the flow accumulation for each cell: the number of cells whose flow
   ///ultimately passes through the focal cell multiplied by the area of each
