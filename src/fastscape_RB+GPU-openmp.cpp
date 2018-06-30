@@ -66,20 +66,23 @@ void FastScape_RBGPU::PrefixSumExclusive(const int n){
   if((1<<lg2n)>frontier_width)
     throw std::runtime_error("Position array length must be less than POS_MAX!");
 
-  //Up-Sweep
-  for (int d=1; d<=lg2n; d++) {
-    const int step = 1<<d;
-    #pragma omp target teams distribute parallel for simd //num_teams(65536) thread_limit(512)
-    for (int k=step-1; k<n; k+=step)
-      stack_pos[k] += stack_pos[k-step/2];
-  }
+  #pragma omp target teams num_teams(1) thread_limit(1024)
+  {
+    //Up-Sweep
+    for (int d=1; d<=lg2n; d++) {
+      const int step = 1<<d;
+      #pragma omp parallel for simd //num_teams(65536) thread_limit(512)
+      for (int k=step-1; k<n; k+=step)
+        stack_pos[k] += stack_pos[k-step/2];
+    }
 
-  //Down-Sweep
-  for (int d=lg2n-1; d>0; d--){
-    const int step = 1<<d;
-    #pragma omp target teams distribute parallel for simd //thread_limit(d)
-    for (int k=step-1; k<n-step/2; k+=step) 
-      stack_pos[k+step/2] += stack_pos[k];
+    //Down-Sweep
+    for (int d=lg2n-1; d>0; d--){
+      const int step = 1<<d;
+      #pragma omp parallel for simd //thread_limit(d)
+      for (int k=step-1; k<n-step/2; k+=step) 
+        stack_pos[k+step/2] += stack_pos[k];
+    }
   }
 }
 
@@ -213,15 +216,18 @@ void FastScape_RBGPU::GenerateOrder(){
   while(level_bottom<level_top){  //Ensure we parse all the cells
     const int lvlsize = level_top-level_bottom;
     //Load donating neighbours of focal cell into the stack
-    #pragma omp target teams distribute parallel for simd collapse(2)
-    for(int si=level_bottom;si<level_top;si++)
-    for(int k=0;k<8;k++){
-      const auto c = stack[si];
-      const auto fpos = si-level_bottom;
-      if(k<ndon[c])
-        frontier[8*fpos+k] = donor[8*c+k];
-      else
-        frontier[8*fpos+k] = -1;
+    #pragma omp target teams distribute parallel for simd
+    for(int i=0;i<8*lvlsize;i++){
+      const auto fpos = i/8;
+      const auto k    = i%8;
+      const auto c    = stack[fpos+level_bottom];
+      if(k<ndon[c]){
+        frontier[i]  = donor[8*c+k];
+        stack_pos[i] = 1;
+      } else {
+        frontier[i]  = -1;
+        stack_pos[i] = 0;
+      }
     }
 
     // #pragma omp target update from(frontier[0:frontier_width])
@@ -230,9 +236,9 @@ void FastScape_RBGPU::GenerateOrder(){
     //   std::cout<<frontier[i]<<" ";
     // std::cout<<std::endl;
 
-    #pragma omp target teams distribute parallel for simd
-    for(int i=0;i<8*lvlsize;i++)
-      stack_pos[i] = (frontier[i]!=-1);
+    // #pragma omp target teams distribute parallel for simd
+    // for(int i=0;i<8*lvlsize;i++)
+    //   stack_pos[i] = (frontier[i]!=-1);
 
     // #pragma omp target update from(stack_pos[0:frontier_width])
     // std::cout<<"stack_pos ones (Level="<<level_bottom<<"-"<<level_top<<"): ";
