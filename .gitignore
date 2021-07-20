@@ -12,3 +12,4 @@ refs/
 paper/
 *.log
 *.o
+build/

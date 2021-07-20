@@ -312,7 +312,7 @@ class FastScape_RBPF {
       //For small levels it is more efficient to run the code in serial. The if-
       //clause in the OpenMP directive below can be adjusted to a suitable value
       //to account for this.
-      #pragma omp parallel for default(none) shared(li) if(lvlsize>500)
+      #pragma omp parallel for default(none) shared(li,lvlstart,lvlend,lvlsize) if(lvlsize>500)
       for(int si=lvlstart;si<lvlend;si++){
         const int c = stack[si];
         for(int k=0;k<ndon[c];k++){

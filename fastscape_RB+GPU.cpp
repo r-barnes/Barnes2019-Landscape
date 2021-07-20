@@ -129,7 +129,7 @@ class FastScape_RBGPU {
     const int height = this->height;
     const int width  = this->width;
 
-    #pragma acc parallel loop independent collapse(2) present(this,nshift[0:8],h[0:size],rec[0:size]) //default(none) present(this,h,rec,dr,nshift)
+    #pragma acc parallel loop independent collapse(2) present(nshift[0:8],h[0:size],rec[0:size]) //default(none) present(this,h,rec,dr,nshift)
     for(int y=2;y<height-2;y++)
     for(int x=2;x<width-2;x++){
       const int c      = y*width+x;
@@ -394,7 +394,6 @@ class FastScape_RBGPU {
       Tmr_Step6_Uplift.start             ();   AddUplift         ();  Tmr_Step6_Uplift.stop             ();
       Tmr_Step7_Erosion.start            ();   Erode             ();  Tmr_Step7_Erosion.stop            ();
 
-      #pragma omp master
       if( step%20==0 )
         std::cout<<"p Step = "<<step<<std::endl;
     }
