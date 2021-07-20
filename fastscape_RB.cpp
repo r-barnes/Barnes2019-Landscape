@@ -18,7 +18,7 @@
 ///Production code for experimentation should probably use GeoTIFF or a similar
 ///format as it will have a smaller file size and, thus, save quicker.
 void PrintDEM(
-  const std::string filename, 
+  const std::string filename,
   const std::vector<double>& h,
   const int width,
   const int height
@@ -95,7 +95,7 @@ class FastScape_RB {
   //the edge of the dataset.
   std::vector<int>    levels;   //Indices of locations in stack where a level begins and ends
   int    nlevel;    //Number of levels used
-  
+
   //Timers for keeping track of how long each part of the code takes
   CumulativeTimer Tmr_Step1_Initialize;
   CumulativeTimer Tmr_Step2_DetermineReceivers;
@@ -127,14 +127,14 @@ class FastScape_RB {
       if(x == 1 || y==1 || x==width-2 || y==height-2)
         h[c] = 0;
     }
-  }  
+  }
 
 
  public:
   ///Initializing code
   FastScape_RB(const int width0, const int height0)
     //Initialize code for finding neighbours of a cell
-    : nshift{-1,-width0-1,-width0,-width0+1,1,width0+1,width0,width0-1} 
+    : nshift{-1,-width0-1,-width0,-width0+1,1,width0+1,width0,width0-1}
   {
     Tmr_Overall.start();
     Tmr_Step1_Initialize.start();
@@ -178,7 +178,7 @@ class FastScape_RB {
         }
       }
       rec[c] = max_n;           //Having considered all neighbours, this is the steepest
-    }    
+    }
   }
 
 
@@ -199,7 +199,7 @@ class FastScape_RB {
       const auto n       = c+nshift[rec[c]];
       donor[8*n+ndon[n]] = c;
       ndon[n]++;
-    }    
+    }
   }
 
 
@@ -215,7 +215,7 @@ class FastScape_RB {
 
     //Since each value of the `levels` array is later used as the starting value
     //of a for-loop, we include a zero at the beginning of the array.
-    levels[0] = 0;     
+    levels[0] = 0;
     nlevel    = 1;     //Note that array now contains a single value
 
     //Load cells without dependencies into the queue. This will include all of
@@ -237,7 +237,7 @@ class FastScape_RB {
       for(int si=level_bottom;si<level_top;si++){
         const auto c = stack[si];
         //Load donating neighbours of focal cell into the stack
-        for(int k=0;k<ndon[c];k++){     
+        for(int k=0;k<ndon[c];k++){
           const auto n = donor[8*c+k];
           stack[nstack++] = n;
         }
@@ -275,7 +275,7 @@ class FastScape_RB {
         const int n = c+nshift[rec[c]];
         accum[n]   += accum[c];
       }
-    }    
+    }
   }
 
 
@@ -292,7 +292,7 @@ class FastScape_RB {
     for(int x=2;x<width-2;x++){
       const int c = y*width+x;
       h[c] += ueq*dt;
-    }    
+    }
   }
 
 
@@ -355,7 +355,7 @@ class FastScape_RB {
     //levels. A tortorously sinuous river may have up to E*E levels. We
     //compromise and choose a number of levels equal to the perimiter because
     //why not?
-    levels.resize(2*width+2*height); 
+    levels.resize(2*width+2*height);
 
     ///All receivers initially point to nowhere
     for(int i=0;i<size;i++)
@@ -377,14 +377,14 @@ class FastScape_RB {
 
     Tmr_Overall.stop();
 
-    std::cout<<"t Step1: Initialize         = "<<std::setw(15)<<Tmr_Step1_Initialize.elapsed()         <<" microseconds"<<std::endl;                 
-    std::cout<<"t Step2: DetermineReceivers = "<<std::setw(15)<<Tmr_Step2_DetermineReceivers.elapsed() <<" microseconds"<<std::endl;                         
-    std::cout<<"t Step3: DetermineDonors    = "<<std::setw(15)<<Tmr_Step3_DetermineDonors.elapsed()    <<" microseconds"<<std::endl;                      
-    std::cout<<"t Step4: GenerateOrder      = "<<std::setw(15)<<Tmr_Step4_GenerateOrder.elapsed()      <<" microseconds"<<std::endl;                    
-    std::cout<<"t Step5: FlowAcc            = "<<std::setw(15)<<Tmr_Step5_FlowAcc.elapsed()            <<" microseconds"<<std::endl;              
-    std::cout<<"t Step6: Uplift             = "<<std::setw(15)<<Tmr_Step6_Uplift.elapsed()             <<" microseconds"<<std::endl;             
-    std::cout<<"t Step7: Erosion            = "<<std::setw(15)<<Tmr_Step7_Erosion.elapsed()            <<" microseconds"<<std::endl;              
-    std::cout<<"t Overall                   = "<<std::setw(15)<<Tmr_Overall.elapsed()                  <<" microseconds"<<std::endl;        
+    std::cout<<"t Step1: Initialize         = "<<std::setw(15)<<Tmr_Step1_Initialize.elapsed()         <<" microseconds"<<std::endl;
+    std::cout<<"t Step2: DetermineReceivers = "<<std::setw(15)<<Tmr_Step2_DetermineReceivers.elapsed() <<" microseconds"<<std::endl;
+    std::cout<<"t Step3: DetermineDonors    = "<<std::setw(15)<<Tmr_Step3_DetermineDonors.elapsed()    <<" microseconds"<<std::endl;
+    std::cout<<"t Step4: GenerateOrder      = "<<std::setw(15)<<Tmr_Step4_GenerateOrder.elapsed()      <<" microseconds"<<std::endl;
+    std::cout<<"t Step5: FlowAcc            = "<<std::setw(15)<<Tmr_Step5_FlowAcc.elapsed()            <<" microseconds"<<std::endl;
+    std::cout<<"t Step6: Uplift             = "<<std::setw(15)<<Tmr_Step6_Uplift.elapsed()             <<" microseconds"<<std::endl;
+    std::cout<<"t Step7: Erosion            = "<<std::setw(15)<<Tmr_Step7_Erosion.elapsed()            <<" microseconds"<<std::endl;
+    std::cout<<"t Overall                   = "<<std::setw(15)<<Tmr_Overall.elapsed()                  <<" microseconds"<<std::endl;
 
     //Free up memory, except for the resulting landscape height field prior to
     //exiting so that unnecessary space is not used when the model is not being
@@ -430,9 +430,9 @@ int main(int argc, char **argv){
 
   //Uses the RichDEM machine-readable line prefixes
   //Name of algorithm
-  std::cout<<"A FastScape RB"<<std::endl;                
+  std::cout<<"A FastScape RB"<<std::endl;
   //Citation for algorithm
-  std::cout<<"C Richard Barnes TODO"<<std::endl;         
+  std::cout<<"C Richard Barnes TODO"<<std::endl;
   //Git hash of code used to produce outputs of algorithm
   std::cout<<"h git_hash    = "<<GIT_HASH<<std::endl;
   //Random seed used to produce outputs

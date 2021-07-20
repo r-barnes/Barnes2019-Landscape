@@ -18,7 +18,7 @@
 ///Production code for experimentation should probably use GeoTIFF or a similar
 ///format as it will have a smaller file size and, thus, save quicker.
 void PrintDEM(
-  const std::string filename, 
+  const std::string filename,
   const std::vector<double>& h,
   const int width,
   const int height
@@ -130,7 +130,7 @@ class FastScape_RBP {
       if(x == 1 || y==1 || x==width-2 || y==height-2)
         h[c] = 0;
     }
-  }  
+  }
 
 
  public:
@@ -181,7 +181,7 @@ class FastScape_RBP {
         }
       }
       rec[c] = max_n;           //Having considered all neighbours, this is the steepest
-    }    
+    }
   }
 
 
@@ -230,7 +230,7 @@ class FastScape_RBP {
       }
     }
     levels[nlevel++] = nstack; //Last cell of this level
-    assert(nlevel<level_width); 
+    assert(nlevel<level_width);
 
     //Start with level_bottom=-1 so we get into the loop, it is immediately
     //replaced by level_top.
@@ -282,7 +282,7 @@ class FastScape_RBP {
         const int n = c+nshift[rec[c]];
         accum[n]   += accum[c];
       }
-    }    
+    }
   }
 
 
@@ -380,7 +380,7 @@ class FastScape_RBP {
     //levels. A tortorously sinuous river may have up to E*E levels. We
     //compromise and choose a number of levels equal to the perimiter because
     //why not?
-    levels.resize(2*width+2*height); 
+    levels.resize(2*width+2*height);
 
     ///All receivers initially point to nowhere
     #pragma omp parallel for
@@ -403,14 +403,14 @@ class FastScape_RBP {
 
     Tmr_Overall.stop();
 
-    std::cout<<"t Step1: Initialize         = "<<std::setw(15)<<Tmr_Step1_Initialize.elapsed()         <<" microseconds"<<std::endl;                 
-    std::cout<<"t Step2: DetermineReceivers = "<<std::setw(15)<<Tmr_Step2_DetermineReceivers.elapsed() <<" microseconds"<<std::endl;                         
-    std::cout<<"t Step3: DetermineDonors    = "<<std::setw(15)<<Tmr_Step3_DetermineDonors.elapsed()    <<" microseconds"<<std::endl;                      
-    std::cout<<"t Step4: GenerateOrder      = "<<std::setw(15)<<Tmr_Step4_GenerateOrder.elapsed()      <<" microseconds"<<std::endl;                    
-    std::cout<<"t Step5: FlowAcc            = "<<std::setw(15)<<Tmr_Step5_FlowAcc.elapsed()            <<" microseconds"<<std::endl;              
-    std::cout<<"t Step6: Uplift             = "<<std::setw(15)<<Tmr_Step6_Uplift.elapsed()             <<" microseconds"<<std::endl;             
-    std::cout<<"t Step7: Erosion            = "<<std::setw(15)<<Tmr_Step7_Erosion.elapsed()            <<" microseconds"<<std::endl;              
-    std::cout<<"t Overall                   = "<<std::setw(15)<<Tmr_Overall.elapsed()                  <<" microseconds"<<std::endl;        
+    std::cout<<"t Step1: Initialize         = "<<std::setw(15)<<Tmr_Step1_Initialize.elapsed()         <<" microseconds"<<std::endl;
+    std::cout<<"t Step2: DetermineReceivers = "<<std::setw(15)<<Tmr_Step2_DetermineReceivers.elapsed() <<" microseconds"<<std::endl;
+    std::cout<<"t Step3: DetermineDonors    = "<<std::setw(15)<<Tmr_Step3_DetermineDonors.elapsed()    <<" microseconds"<<std::endl;
+    std::cout<<"t Step4: GenerateOrder      = "<<std::setw(15)<<Tmr_Step4_GenerateOrder.elapsed()      <<" microseconds"<<std::endl;
+    std::cout<<"t Step5: FlowAcc            = "<<std::setw(15)<<Tmr_Step5_FlowAcc.elapsed()            <<" microseconds"<<std::endl;
+    std::cout<<"t Step6: Uplift             = "<<std::setw(15)<<Tmr_Step6_Uplift.elapsed()             <<" microseconds"<<std::endl;
+    std::cout<<"t Step7: Erosion            = "<<std::setw(15)<<Tmr_Step7_Erosion.elapsed()            <<" microseconds"<<std::endl;
+    std::cout<<"t Overall                   = "<<std::setw(15)<<Tmr_Overall.elapsed()                  <<" microseconds"<<std::endl;
 
     //Free up memory, except for the resulting landscape height field prior to
     //exiting so that unnecessary space is not used when the model is not being
@@ -456,7 +456,7 @@ int main(int argc, char **argv){
 
   //Uses the RichDEM machine-readable line prefixes
   //Name of algorithm
-  std::cout<<"A FastScape RB+P"<<std::endl;                
+  std::cout<<"A FastScape RB+P"<<std::endl;
   //Citation for algorithm
   std::cout<<"C Richard Barnes TODO"<<std::endl;
   //Git hash of code used to produce outputs of algorithm

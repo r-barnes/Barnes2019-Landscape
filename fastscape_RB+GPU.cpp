@@ -13,7 +13,7 @@
 
 
 void PrintDEM(
-  const std::string filename, 
+  const std::string filename,
   const double *const h,
   const int width,
   const int height
@@ -48,7 +48,7 @@ class FastScape_RBGPU {
   const double meq       = 0.8;
   const double ueq       = 2e-3;
   const double dt        = 1000.;
-  const double dr[8]     = {1,SQRT2,1,SQRT2,1,SQRT2,1,SQRT2};  
+  const double dr[8]     = {1,SQRT2,1,SQRT2,1,SQRT2,1,SQRT2};
   const double tol       = 1e-3;
   const double cell_area = 40000;
 
@@ -76,7 +76,7 @@ class FastScape_RBGPU {
 
   int    *levels;   //Indices of locations in stack where a level begins and ends
   int    nlevel;    //Number of levels used
-  
+
   CumulativeTimer Tmr_Step1_Initialize;
   CumulativeTimer Tmr_Step2_DetermineReceivers;
   CumulativeTimer Tmr_Step3_DetermineDonors;
@@ -99,7 +99,7 @@ class FastScape_RBGPU {
       if(x == 1 || y==1 || x==width-2 || y==height-2)
         h[c] = 0;
     }
-  }  
+  }
 
 
  public:
@@ -208,8 +208,8 @@ class FastScape_RBGPU {
       }
     }
     //Last cell of this level
-    levels[nlevel++] = nstack; 
-    assert(nlevel<level_width); 
+    levels[nlevel++] = nstack;
+    assert(nlevel<level_width);
 
     //#pragma acc update host(stack[0:stack_width])
 
@@ -256,7 +256,7 @@ class FastScape_RBGPU {
         }
       }
 
-      levels[nlevel++] = nstack; //Starting a new level      
+      levels[nlevel++] = nstack; //Starting a new level
     }
 
     // std::cout<<"nstack = "<<nstack<<std::endl;
@@ -297,7 +297,7 @@ class FastScape_RBGPU {
           accum[c]    += accum[n];
         }
       }
-    }    
+    }
   }
 
 
@@ -309,7 +309,7 @@ class FastScape_RBGPU {
     for(int y=2;y<height-2;y++)
     for(int x=2;x<width-2;x++){
       const int c = y*width+x;
-      h[c]       += ueq*dt; 
+      h[c]       += ueq*dt;
     }
   }
 
@@ -401,14 +401,14 @@ class FastScape_RBGPU {
 
     Tmr_Overall.stop();
 
-    std::cout<<"t Step1: Initialize         = "<<std::setw(15)<<Tmr_Step1_Initialize.elapsed()         <<" microseconds"<<std::endl;                 
-    std::cout<<"t Step2: DetermineReceivers = "<<std::setw(15)<<Tmr_Step2_DetermineReceivers.elapsed() <<" microseconds"<<std::endl;                         
-    std::cout<<"t Step3: DetermineDonors    = "<<std::setw(15)<<Tmr_Step3_DetermineDonors.elapsed()    <<" microseconds"<<std::endl;                      
-    std::cout<<"t Step4: GenerateOrder      = "<<std::setw(15)<<Tmr_Step4_GenerateOrder.elapsed()      <<" microseconds"<<std::endl;                 
-    std::cout<<"t Step5: FlowAcc            = "<<std::setw(15)<<Tmr_Step5_FlowAcc.elapsed()            <<" microseconds"<<std::endl;              
-    std::cout<<"t Step6: Uplift             = "<<std::setw(15)<<Tmr_Step6_Uplift.elapsed()             <<" microseconds"<<std::endl;             
-    std::cout<<"t Step7: Erosion            = "<<std::setw(15)<<Tmr_Step7_Erosion.elapsed()            <<" microseconds"<<std::endl;              
-    std::cout<<"t Overall                   = "<<std::setw(15)<<Tmr_Overall.elapsed()                  <<" microseconds"<<std::endl;        
+    std::cout<<"t Step1: Initialize         = "<<std::setw(15)<<Tmr_Step1_Initialize.elapsed()         <<" microseconds"<<std::endl;
+    std::cout<<"t Step2: DetermineReceivers = "<<std::setw(15)<<Tmr_Step2_DetermineReceivers.elapsed() <<" microseconds"<<std::endl;
+    std::cout<<"t Step3: DetermineDonors    = "<<std::setw(15)<<Tmr_Step3_DetermineDonors.elapsed()    <<" microseconds"<<std::endl;
+    std::cout<<"t Step4: GenerateOrder      = "<<std::setw(15)<<Tmr_Step4_GenerateOrder.elapsed()      <<" microseconds"<<std::endl;
+    std::cout<<"t Step5: FlowAcc            = "<<std::setw(15)<<Tmr_Step5_FlowAcc.elapsed()            <<" microseconds"<<std::endl;
+    std::cout<<"t Step6: Uplift             = "<<std::setw(15)<<Tmr_Step6_Uplift.elapsed()             <<" microseconds"<<std::endl;
+    std::cout<<"t Step7: Erosion            = "<<std::setw(15)<<Tmr_Step7_Erosion.elapsed()            <<" microseconds"<<std::endl;
+    std::cout<<"t Overall                   = "<<std::setw(15)<<Tmr_Overall.elapsed()                  <<" microseconds"<<std::endl;
 
     #pragma acc exit data copyout(h[0:size]) delete(this,accum[0:size],rec[0:size],ndon[0:size],donor[0:8*size],stack[0:stack_width],nlevel,levels[0:level_width])
 

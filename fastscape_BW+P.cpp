@@ -20,7 +20,7 @@
 ///Production code for experimentation should probably use GeoTIFF or a similar
 ///format as it will have a smaller file size and, thus, save quicker.
 void PrintDEM(
-  const std::string filename, 
+  const std::string filename,
   const std::vector<double>& h,
   const int width,
   const int height
@@ -125,7 +125,7 @@ class FastScape_BWP {
       if(x == 1 || y==1 || x==width-2 || y==height-2)
         h[c] = 0;
     }
-  }  
+  }
 
 
  public:
@@ -183,7 +183,7 @@ class FastScape_BWP {
         }
       }
       rec[c] = max_n;           //Having considered all neighbours, this is the steepest
-    }   
+    }
   }
 
 
@@ -223,7 +223,7 @@ class FastScape_BWP {
   void GenerateOrder(){
     //The `stack_start` array has an unpredictable size, so we fill it
     //dynamically and reset it each time. This should have minimal impact on the
-    //algorithm's speed since std::vector's memory is not actually reallocated.    
+    //algorithm's speed since std::vector's memory is not actually reallocated.
     stack_start.clear();
 
     int nstack=0;
@@ -233,9 +233,9 @@ class FastScape_BWP {
         stack[nstack++] = c;
         FindStack(c,nstack);
       }
-    }  
+    }
     //We add an additional note to the end of `stack_start` that serves as an
-    //upper bound on the locations of the cells in the final stack. See b    
+    //upper bound on the locations of the cells in the final stack. See b
     stack_start.push_back(nstack);
   }
 
@@ -256,8 +256,8 @@ class FastScape_BWP {
         const int n = c+nshift[rec[c]];
         accum[n]   += accum[c];
       }
-    }   
-  } 
+    }
+  }
 
 
 
@@ -273,7 +273,7 @@ class FastScape_BWP {
     for(int x=2;x<width-2;x++){
       const int c = y*width+x;
       h[c] += ueq*dt;
-    }    
+    }
   }
 
 
@@ -353,14 +353,14 @@ class FastScape_BWP {
 
     Tmr_Overall.stop();
 
-    std::cout<<"t Step1: Initialize         = "<<std::setw(15)<<Tmr_Step1_Initialize.elapsed()         <<" microseconds"<<std::endl;                 
-    std::cout<<"t Step2: DetermineReceivers = "<<std::setw(15)<<Tmr_Step2_DetermineReceivers.elapsed() <<" microseconds"<<std::endl;                         
-    std::cout<<"t Step3: DetermineDonors    = "<<std::setw(15)<<Tmr_Step3_DetermineDonors.elapsed()    <<" microseconds"<<std::endl;                      
-    std::cout<<"t Step4: GenerateOrder      = "<<std::setw(15)<<Tmr_Step4_GenerateOrder.elapsed()      <<" microseconds"<<std::endl;                    
-    std::cout<<"t Step5: FlowAcc            = "<<std::setw(15)<<Tmr_Step5_FlowAcc.elapsed()            <<" microseconds"<<std::endl;              
-    std::cout<<"t Step6: Uplift             = "<<std::setw(15)<<Tmr_Step6_Uplift.elapsed()             <<" microseconds"<<std::endl;             
-    std::cout<<"t Step7: Erosion            = "<<std::setw(15)<<Tmr_Step7_Erosion.elapsed()            <<" microseconds"<<std::endl;              
-    std::cout<<"t Overall                   = "<<std::setw(15)<<Tmr_Overall.elapsed()                  <<" microseconds"<<std::endl;        
+    std::cout<<"t Step1: Initialize         = "<<std::setw(15)<<Tmr_Step1_Initialize.elapsed()         <<" microseconds"<<std::endl;
+    std::cout<<"t Step2: DetermineReceivers = "<<std::setw(15)<<Tmr_Step2_DetermineReceivers.elapsed() <<" microseconds"<<std::endl;
+    std::cout<<"t Step3: DetermineDonors    = "<<std::setw(15)<<Tmr_Step3_DetermineDonors.elapsed()    <<" microseconds"<<std::endl;
+    std::cout<<"t Step4: GenerateOrder      = "<<std::setw(15)<<Tmr_Step4_GenerateOrder.elapsed()      <<" microseconds"<<std::endl;
+    std::cout<<"t Step5: FlowAcc            = "<<std::setw(15)<<Tmr_Step5_FlowAcc.elapsed()            <<" microseconds"<<std::endl;
+    std::cout<<"t Step6: Uplift             = "<<std::setw(15)<<Tmr_Step6_Uplift.elapsed()             <<" microseconds"<<std::endl;
+    std::cout<<"t Step7: Erosion            = "<<std::setw(15)<<Tmr_Step7_Erosion.elapsed()            <<" microseconds"<<std::endl;
+    std::cout<<"t Overall                   = "<<std::setw(15)<<Tmr_Overall.elapsed()                  <<" microseconds"<<std::endl;
 
     //Free up memory, except for the resulting landscape height field prior to
     //exiting so that unnecessary space is not used when the model is not being
@@ -405,7 +405,7 @@ int main(int argc, char **argv){
 
   //Uses the RichDEM machine-readable line prefixes
   //Name of algorithm
-  std::cout<<"A FastScape B&W+P"<<std::endl;                
+  std::cout<<"A FastScape B&W+P"<<std::endl;
   //Citation for algorithm
   std::cout<<"C Richard Barnes TODO"<<std::endl;
   //Git hash of code used to produce outputs of algorithm
