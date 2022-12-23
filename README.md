@@ -1,8 +1,11 @@
-Barnes2018-Landscape
+[![DOI](https://zenodo.org/badge/110618450.svg)](https://zenodo.org/badge/latestdoi/110618450)
+
+Barnes2019-Landscape
 ============================
 
+
 **Title of Manuscript**:
-Accelerating a landscape evolution model with parallelism
+Accelerating a fluvial incision and landscape evolution model with parallelism
 
 **Authors**: Richard Barnes
 
